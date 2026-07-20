@@ -1,26 +1,386 @@
 @import "tailwindcss";
 
+/* ============================================
+   QUIZY ARENA — Premium Design System
+   ============================================
+   Light mode = default (:root)
+   Dark mode  = .dark class on <html>
+   ============================================ */
+
+/* ── Light Mode (Default) ── */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Backgrounds */
+  --arena-bg: #F8FAFC;
+  --arena-surface: #FFFFFF;
+  --arena-card: #FFFFFF;
+  --arena-card-hover: #F1F5F9;
+
+  /* Primary */
+  --arena-primary: #2563EB;
+  --arena-primary-hover: #1D4ED8;
+  --arena-primary-muted: rgba(37, 99, 235, 0.08);
+
+  /* Accent */
+  --arena-accent: #3B82F6;
+  --arena-accent-muted: rgba(59, 130, 246, 0.08);
+
+  /* Semantic */
+  --arena-success: #16A34A;
+  --arena-success-muted: rgba(22, 163, 74, 0.08);
+  --arena-warning: #D97706;
+  --arena-warning-muted: rgba(217, 119, 6, 0.08);
+  --arena-danger: #DC2626;
+  --arena-danger-muted: rgba(220, 38, 38, 0.08);
+
+  /* Text */
+  --arena-text-primary: #0F172A;
+  --arena-text-secondary: #475569;
+  --arena-text-tertiary: #94A3B8;
+  --arena-text-disabled: #CBD5E1;
+
+  /* Border */
+  --arena-border: #E2E8F0;
+  --arena-border-hover: #CBD5E1;
+  --arena-border-focus: rgba(37, 99, 235, 0.4);
+
+  /* Overlay */
+  --arena-overlay: rgba(15, 23, 42, 0.5);
+
+  /* Shadows — soft, Apple-style */
+  --arena-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.03);
+  --arena-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --arena-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03);
+  --arena-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.08), 0 4px 8px rgba(0, 0, 0, 0.03);
+  --arena-shadow-xl: 0 20px 48px rgba(0, 0, 0, 0.1), 0 8px 16px rgba(0, 0, 0, 0.04);
+  --arena-shadow-glow-primary: 0 0 0 3px rgba(37, 99, 235, 0.12);
+  --arena-shadow-glow-success: 0 0 0 3px rgba(22, 163, 74, 0.12);
+
+  /* Radius — more generous, Apple-style */
+  --arena-radius-sm: 8px;
+  --arena-radius-md: 12px;
+  --arena-radius-lg: 16px;
+  --arena-radius-xl: 24px;
+  --arena-radius-2xl: 32px;
+
+  /* Animation Durations */
+  --arena-duration-instant: 100ms;
+  --arena-duration-fast: 150ms;
+  --arena-duration-normal: 200ms;
+  --arena-duration-slow: 300ms;
+  --arena-duration-slower: 500ms;
+
+  /* Easing — Apple-style spring-like */
+  --arena-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --arena-ease-in: cubic-bezier(0.55, 0.055, 0.675, 0.19);
+  --arena-ease-in-out: cubic-bezier(0.87, 0, 0.13, 1);
+  --arena-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Hero gradient */
+  --arena-hero-from: #DBEAFE;
+  --arena-hero-to: #EFF6FF;
+
+  /* Nav */
+  --arena-nav-active-bg: rgba(37, 99, 235, 0.08);
+  --arena-nav-active-text: #2563EB;
 }
 
+/* ── Dark Mode ── */
+.dark {
+  --arena-bg: #020617;
+  --arena-surface: #0F172A;
+  --arena-card: #111827;
+  --arena-card-hover: #1E293B;
+
+  --arena-primary: #3B82F6;
+  --arena-primary-hover: #2563EB;
+  --arena-primary-muted: rgba(59, 130, 246, 0.12);
+
+  --arena-accent: #60A5FA;
+  --arena-accent-muted: rgba(96, 165, 250, 0.12);
+
+  --arena-success: #22C55E;
+  --arena-success-muted: rgba(34, 197, 94, 0.12);
+  --arena-warning: #FACC15;
+  --arena-warning-muted: rgba(250, 204, 21, 0.12);
+  --arena-danger: #EF4444;
+  --arena-danger-muted: rgba(239, 68, 68, 0.12);
+
+  --arena-text-primary: #F8FAFC;
+  --arena-text-secondary: #94A3B8;
+  --arena-text-tertiary: #64748B;
+  --arena-text-disabled: #475569;
+
+  --arena-border: rgba(255, 255, 255, 0.08);
+  --arena-border-hover: rgba(255, 255, 255, 0.14);
+  --arena-border-focus: rgba(59, 130, 246, 0.5);
+
+  --arena-overlay: rgba(0, 0, 0, 0.7);
+
+  --arena-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --arena-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.25);
+  --arena-shadow-md: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --arena-shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.4);
+  --arena-shadow-xl: 0 20px 48px rgba(0, 0, 0, 0.5);
+  --arena-shadow-glow-primary: 0 0 20px rgba(59, 130, 246, 0.15);
+  --arena-shadow-glow-success: 0 0 20px rgba(34, 197, 94, 0.15);
+
+  --arena-hero-from: #0F172A;
+  --arena-hero-to: #1E293B;
+
+  --arena-nav-active-bg: rgba(59, 130, 246, 0.12);
+  --arena-nav-active-text: #60A5FA;
+}
+
+/* ── Tailwind v4 Theme Tokens ── */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Colors */
+  --color-bg: var(--arena-bg);
+  --color-surface: var(--arena-surface);
+  --color-card: var(--arena-card);
+  --color-card-hover: var(--arena-card-hover);
+
+  --color-primary: var(--arena-primary);
+  --color-primary-hover: var(--arena-primary-hover);
+  --color-primary-muted: var(--arena-primary-muted);
+
+  --color-accent: var(--arena-accent);
+  --color-accent-muted: var(--arena-accent-muted);
+
+  --color-success: var(--arena-success);
+  --color-success-muted: var(--arena-success-muted);
+  --color-warning: var(--arena-warning);
+  --color-warning-muted: var(--arena-warning-muted);
+  --color-danger: var(--arena-danger);
+  --color-danger-muted: var(--arena-danger-muted);
+
+  --color-text-primary: var(--arena-text-primary);
+  --color-text-secondary: var(--arena-text-secondary);
+  --color-text-tertiary: var(--arena-text-tertiary);
+  --color-text-disabled: var(--arena-text-disabled);
+
+  --color-border: var(--arena-border);
+  --color-border-hover: var(--arena-border-hover);
+  --color-border-focus: var(--arena-border-focus);
+
+  --color-overlay: var(--arena-overlay);
+  --color-hero-from: var(--arena-hero-from);
+  --color-hero-to: var(--arena-hero-to);
+
+  /* Fonts */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+
+  /* Radius */
+  --radius-sm: var(--arena-radius-sm);
+  --radius-md: var(--arena-radius-md);
+  --radius-lg: var(--arena-radius-lg);
+  --radius-xl: var(--arena-radius-xl);
+  --radius-2xl: var(--arena-radius-2xl);
+
+  /* Shadows */
+  --shadow-xs: var(--arena-shadow-xs);
+  --shadow-sm: var(--arena-shadow-sm);
+  --shadow-md: var(--arena-shadow-md);
+  --shadow-lg: var(--arena-shadow-lg);
+  --shadow-xl: var(--arena-shadow-xl);
+  --shadow-glow-primary: var(--arena-shadow-glow-primary);
+  --shadow-glow-success: var(--arena-shadow-glow-success);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* ============================================
+   BASE STYLES
+   ============================================ */
+
+html {
+  background-color: var(--arena-bg);
+  color: var(--arena-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+  scroll-behavior: smooth;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--arena-bg);
+  color: var(--arena-text-secondary);
+  font-family: var(--font-sans);
+  min-height: 100dvh;
+  overflow-x: hidden;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--arena-border-hover);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--arena-text-tertiary);
+}
+
+/* ── Focus Ring ── */
+*:focus-visible {
+  outline: 2px solid var(--arena-border-focus);
+  outline-offset: 2px;
+  border-radius: var(--arena-radius-sm);
+}
+
+/* ── Reduced Motion ── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ── Selection ── */
+::selection {
+  background-color: var(--arena-primary-muted);
+  color: var(--arena-text-primary);
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+/* Skeleton loading pulse */
+@keyframes arena-skeleton-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 0.8; }
+}
+
+.arena-skeleton {
+  animation: arena-skeleton-pulse 1.5s ease-in-out infinite;
+  background-color: var(--arena-card-hover);
+  border-radius: var(--arena-radius-md);
+}
+
+/* Breathing animation */
+@keyframes arena-breathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+
+.arena-breathe {
+  animation: arena-breathe 2.5s ease-in-out infinite;
+}
+
+/* Float animation for illustrations */
+@keyframes arena-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+.arena-float {
+  animation: arena-float 4s ease-in-out infinite;
+}
+
+/* Shimmer highlight */
+@keyframes arena-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.arena-shimmer {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: arena-shimmer 2s ease-in-out infinite;
+}
+
+/* Card lift hover */
+.arena-card-lift {
+  transition: transform 0.2s var(--arena-ease-out), box-shadow 0.2s var(--arena-ease-out);
+}
+
+.arena-card-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--arena-shadow-lg);
+}
+
+.arena-card-lift:active {
+  transform: translateY(0) scale(0.98);
+}
+
+/* Hide scrollbar but keep scrolling */
+.arena-scroll-hidden {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.arena-scroll-hidden::-webkit-scrollbar {
+  display: none;
+}
+
+/* Overline text style */
+.arena-overline {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--arena-text-tertiary);
+  line-height: 1.3;
+}
+
+/* Section heading */
+.arena-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--arena-text-primary);
+  letter-spacing: -0.01em;
+}
+
+/* Stat number style (monospace) */
+.arena-stat {
+  font-family: var(--font-mono);
+  font-size: 1.75rem;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--arena-text-primary);
+}
+
+/* Timer display style (monospace) */
+.arena-timer {
+  font-family: var(--font-mono);
+  font-size: 2.5rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--arena-text-primary);
+}
+
+/* Gradient text */
+.arena-gradient-text {
+  background: linear-gradient(135deg, var(--arena-primary), var(--arena-accent));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Glass surface */
+.arena-glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.dark .arena-glass {
+  background: rgba(15, 23, 42, 0.8);
 }
