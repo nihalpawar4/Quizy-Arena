@@ -132,16 +132,33 @@ class ListenerManager {
     const q: Query = constraints.length > 0 ? query(ref, ...constraints) : query(ref);
     const callbacks = new Set<(data: unknown) => void>([wrappedCallback]);
 
-    const firestoreUnsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map((d) => ({ ...d.data(), id: d.id }) as T);
-      const entry = this.listeners.get(key);
-      if (entry) {
-        entry.lastData = data;
-        for (const cb of entry.callbacks) {
-          cb(data);
+    const firestoreUnsub = onSnapshot(
+      q,
+      (snap) => {
+        const data = snap.docs.map((d) => ({ ...d.data(), id: d.id }) as T);
+        const entry = this.listeners.get(key);
+        if (entry) {
+          entry.lastData = data;
+          for (const cb of entry.callbacks) {
+            cb(data);
+          }
         }
-      }
-    });
+      },
+      (error) => {
+        console.warn(
+          `[Firestore] Listener denied subcollection (${parentCollection}/${parentId}/${subCollection}):`,
+          error.code,
+          error.message,
+        );
+        const entry = this.listeners.get(key);
+        if (entry) {
+          entry.lastData = [];
+          for (const cb of entry.callbacks) {
+            cb([]);
+          }
+        }
+      },
+    );
 
     this.listeners.set(key, {
       unsubscribe: firestoreUnsub,

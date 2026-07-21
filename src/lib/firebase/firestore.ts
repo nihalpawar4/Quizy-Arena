@@ -221,14 +221,19 @@ export function listenToDocument<T>(
   docId: string,
   callback: (data: T | null) => void,
 ): Unsubscribe {
-  return onSnapshot(doc(getFirebaseDb(), collectionName, docId), (snap) => {
-    const data = snap.exists() ? (snap.data() as T) : null;
-
-    // Keep cache in sync with real-time data
-    firebaseCache.set(`${collectionName}:${docId}`, data);
-
-    callback(data);
-  });
+  return onSnapshot(
+    doc(getFirebaseDb(), collectionName, docId),
+    (snap) => {
+      const data = snap.exists() ? (snap.data() as T) : null;
+      // Keep cache in sync with real-time data
+      firebaseCache.set(`${collectionName}:${docId}`, data);
+      callback(data);
+    },
+    (err) => {
+      console.warn(`[Firestore] Listen to doc denied (${collectionName}/${docId}):`, err.code, err.message);
+      callback(null);
+    },
+  );
 }
 
 /**
@@ -245,10 +250,17 @@ export function listenToSubCollection<T>(
   const ref = collection(getFirebaseDb(), parentCollection, parentId, subCollection);
   const q = constraints.length > 0 ? query(ref, ...constraints) : query(ref);
 
-  return onSnapshot(q, (snap) => {
-    const data = snap.docs.map((d) => ({ ...d.data(), id: d.id }) as T);
-    callback(data);
-  });
+  return onSnapshot(
+    q,
+    (snap) => {
+      const data = snap.docs.map((d) => ({ ...d.data(), id: d.id }) as T);
+      callback(data);
+    },
+    (err) => {
+      console.warn(`[Firestore] Listen to subcollection denied (${parentCollection}/${parentId}/${subCollection}):`, err.code, err.message);
+      callback([]);
+    },
+  );
 }
 
 /**
