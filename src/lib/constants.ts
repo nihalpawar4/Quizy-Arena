@@ -43,13 +43,16 @@ export const WORLDS = [
 ] as const;
 
 // ── Upcoming / locked games (shown in Discover) ──
-export const UPCOMING_GAMES = [
-  { slug: 'ice-puzzle', title: 'Ice Puzzle', skill: 'Logic', time: '4 min', unlockLevel: 6, worldSlug: 'ice-kingdom', color: '#60A5FA', iconKey: 'puzzle' as const },
-  { slug: 'frost-reflex', title: 'Frost Reflex', skill: 'Reaction', time: '2 min', unlockLevel: 7, worldSlug: 'ice-kingdom', color: '#93C5FD', iconKey: 'lightning' as const },
-  { slug: 'desert-riddle', title: 'Desert Riddle', skill: 'Problem Solving', time: '3 min', unlockLevel: 10, worldSlug: 'desert-of-logic', color: '#F59E0B', iconKey: 'eye' as const },
-  { slug: 'lava-logic', title: 'Lava Logic', skill: 'Logic', time: '4 min', unlockLevel: 15, worldSlug: 'volcano-peak', color: '#EF4444', iconKey: 'puzzle' as const },
-  { slug: 'cyber-code', title: 'Cyber Code', skill: 'Pattern', time: '3 min', unlockLevel: 20, worldSlug: 'cyber-city', color: '#A855F7', iconKey: 'crystal' as const },
-] as const;
+export const UPCOMING_GAMES: readonly {
+  slug: string;
+  title: string;
+  skill: string;
+  time: string;
+  unlockLevel: number;
+  worldSlug: string;
+  color: string;
+  iconKey: 'brain' | 'lightning' | 'target' | 'puzzle' | 'eye' | 'crystal';
+}[] = [];
 
 // ── Chest Types ──
 export const CHEST_TYPES = {

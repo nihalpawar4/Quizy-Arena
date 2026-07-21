@@ -6,28 +6,28 @@ import type { GameComponentProps } from '@/engine/types';
 import { GameGrid } from '@/engine/primitives/game-grid';
 import { cn } from '@/lib/utils';
 
-// Colored symbol pairs for memory cards (no emojis)
+// Animal & nature emoji pairs for memory cards
 const CARD_SYMBOLS = [
-  { id: 'A', color: '#3B82F6' },
-  { id: 'B', color: '#22C55E' },
-  { id: 'C', color: '#FACC15' },
-  { id: 'D', color: '#EF4444' },
-  { id: 'E', color: '#8B5CF6' },
-  { id: 'F', color: '#F97316' },
-  { id: 'G', color: '#06B6D4' },
-  { id: 'H', color: '#EC4899' },
-  { id: 'I', color: '#14B8A6' },
-  { id: 'J', color: '#6366F1' },
-  { id: 'K', color: '#84CC16' },
-  { id: 'L', color: '#A855F7' },
-  { id: 'M', color: '#0EA5E9' },
-  { id: 'N', color: '#F43F5E' },
-  { id: 'O', color: '#10B981' },
-  { id: 'P', color: '#EAB308' },
-  { id: 'Q', color: '#64748B' },
-  { id: 'R', color: '#7C3AED' },
-  { id: 'S', color: '#2563EB' },
-  { id: 'T', color: '#059669' },
+  { id: '🐶', color: '#F59E0B' },
+  { id: '🐱', color: '#8B5CF6' },
+  { id: '🦊', color: '#F97316' },
+  { id: '🐻', color: '#92400E' },
+  { id: '🐼', color: '#1F2937' },
+  { id: '🐸', color: '#22C55E' },
+  { id: '🦁', color: '#F59E0B' },
+  { id: '🐵', color: '#A16207' },
+  { id: '🐰', color: '#EC4899' },
+  { id: '🦉', color: '#78716C' },
+  { id: '🐝', color: '#EAB308' },
+  { id: '🐢', color: '#16A34A' },
+  { id: '🦋', color: '#3B82F6' },
+  { id: '🐙', color: '#E11D48' },
+  { id: '🐬', color: '#0EA5E9' },
+  { id: '🦜', color: '#22C55E' },
+  { id: '🦄', color: '#D946EF' },
+  { id: '🐲', color: '#DC2626' },
+  { id: '🐠', color: '#06B6D4' },
+  { id: '🐘', color: '#6B7280' },
 ];
 
 interface Card {
@@ -210,13 +210,13 @@ export default function MemoryMatchGame({ engine }: GameComponentProps) {
               ?
             </span>
 
-            {/* Front face (symbol) */}
+            {/* Front face (emoji) */}
             <span
               className={cn(
-                'absolute text-lg font-bold',
+                'absolute text-3xl',
                 !(card.isFlipped || card.isMatched) && 'opacity-0',
               )}
-              style={{ transform: 'rotateY(180deg)', color: card.color }}
+              style={{ transform: 'rotateY(180deg)' }}
             >
               {card.symbolId}
             </span>

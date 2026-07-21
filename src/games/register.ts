@@ -8,6 +8,7 @@
 import { registerGame } from '@/engine/registry';
 import { lazy } from 'react';
 
+// ── Training Camp ──
 import { memoryMatchDefinition } from './memory-match/definition';
 registerGame({
   definition: memoryMatchDefinition,
@@ -26,7 +27,7 @@ registerGame({
   component: lazy(() => import('./pattern-recall/game')),
 });
 
-// Forest of Focus — reuses core mechanics, separate progression slugs
+// ── Forest of Focus ──
 import { memoryGroveDefinition } from './memory-grove/definition';
 registerGame({
   definition: memoryGroveDefinition,
@@ -43,4 +44,38 @@ import { patternTrailDefinition } from './pattern-trail/definition';
 registerGame({
   definition: patternTrailDefinition,
   component: lazy(() => import('./pattern-recall/game')),
+});
+
+// ── Ice Kingdom ──
+import { icePuzzleDefinition } from './ice-puzzle/definition';
+registerGame({
+  definition: icePuzzleDefinition,
+  component: lazy(() => import('./ice-puzzle/game')),
+});
+
+import { frostReflexDefinition } from './frost-reflex/definition';
+registerGame({
+  definition: frostReflexDefinition,
+  component: lazy(() => import('./frost-reflex/game')),
+});
+
+// ── Desert of Logic ──
+import { desertRiddleDefinition } from './desert-riddle/definition';
+registerGame({
+  definition: desertRiddleDefinition,
+  component: lazy(() => import('./desert-riddle/game')),
+});
+
+// ── Volcano Peak ──
+import { lavaLogicDefinition } from './lava-logic/definition';
+registerGame({
+  definition: lavaLogicDefinition,
+  component: lazy(() => import('./lava-logic/game')),
+});
+
+// ── Cyber City ──
+import { cyberCodeDefinition } from './cyber-code/definition';
+registerGame({
+  definition: cyberCodeDefinition,
+  component: lazy(() => import('./cyber-code/game')),
 });

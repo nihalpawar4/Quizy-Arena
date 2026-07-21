@@ -1,8 +1,15 @@
-/** Max playable levels per game (Phase 1). */
-export const MAX_GAME_LEVEL = 3;
+/** Max playable levels per game. */
+export const MAX_GAME_LEVEL = 10;
 
 /** Worlds with playable content in this release. */
-export const ACTIVE_WORLD_SLUGS = ['training-camp', 'forest-of-focus'] as const;
+export const ACTIVE_WORLD_SLUGS = [
+  'training-camp',
+  'forest-of-focus',
+  'ice-kingdom',
+  'desert-of-logic',
+  'volcano-peak',
+  'cyber-city',
+] as const;
 
 export function clampGameLevel(level: number): number {
   return Math.max(1, Math.min(MAX_GAME_LEVEL, level));

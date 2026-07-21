@@ -11,10 +11,12 @@ import { ResultScreen } from './result-screen';
 import { FeedbackFlash } from './feedback-flash';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChevronRight, ArrowLeft } from 'lucide-react';
+import { ChevronRight, ArrowLeft, Coins } from 'lucide-react';
 import { GameIcon } from '@/components/games/game-icon';
 import { CoinIcon, DiamondIcon, LightningIcon } from '@/components/illustrations/icons';
 import { MAX_GAME_LEVEL } from '@/lib/game-config';
+import { getGameCoinCost, canAffordGame, deductCoins, buyExtraLife, DIAMOND_PER_LIFE } from '../economy';
+import { useAuthStore } from '@/stores/auth-store';
 import { cn } from '@/lib/utils';
 
 interface GameShellProps {
@@ -30,9 +32,9 @@ interface GameShellProps {
  * It renders the appropriate overlay/HUD for each state.
  * The game component only renders during the 'playing' state.
  *
- * Supports infinite level progression:
- * - "Play Again" resets at the same level
- * - "Next Level" increments level and resets
+ * Supports up to 10 levels of progression.
+ * Level 2+ costs coins to play.
+ * Diamonds can be used to buy extra lives.
  */
 export function GameShell({
   definition,
@@ -42,29 +44,72 @@ export function GameShell({
   onExit,
 }: GameShellProps) {
   const [currentLevel, setCurrentLevel] = useState(initialLevel);
-  const [gameKey, setGameKey] = useState(0); // Forces re-mount of game component on reset
+  const [gameKey, setGameKey] = useState(0);
+  const [coinCheckPassed, setCoinCheckPassed] = useState(false);
+  const [deductingCoins, setDeductingCoins] = useState(false);
+
+  const userProfile = useAuthStore((s) => s.userProfile);
+  const firebaseUser = useAuthStore((s) => s.firebaseUser);
+  const userCoins = userProfile?.coins ?? 0;
+  const userDiamonds = userProfile?.diamonds ?? 0;
+
+  const coinCost = getGameCoinCost(currentLevel);
+  const canAfford = canAffordGame(userCoins, currentLevel);
 
   const engine = useGameEngine({ definition, difficulty, level: currentLevel });
 
   // Auto-signal ready once mounted (or after reset)
   useEffect(() => {
     if (engine.state === 'loading') {
+      // For Level 1 (free), skip coin check
+      if (coinCost === 0) {
+        setCoinCheckPassed(true);
+      }
       const timeout = setTimeout(() => engine.ready(), 300);
       return () => clearTimeout(timeout);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine.state, gameKey]);
 
+  const handlePayAndStart = useCallback(async () => {
+    if (!firebaseUser) return;
+    if (coinCost === 0) {
+      setCoinCheckPassed(true);
+      engine.startCountdown();
+      return;
+    }
+
+    setDeductingCoins(true);
+    const success = await deductCoins(firebaseUser.uid, coinCost);
+    setDeductingCoins(false);
+
+    if (success) {
+      setCoinCheckPassed(true);
+      engine.startCountdown();
+    }
+  }, [firebaseUser, coinCost, engine]);
+
   const handlePlayAgain = useCallback(() => {
+    setCoinCheckPassed(false);
     engine.reset();
     setGameKey((k) => k + 1);
   }, [engine]);
 
   const handleNextLevel = useCallback(() => {
+    setCoinCheckPassed(false);
     setCurrentLevel((l) => Math.min(l + 1, MAX_GAME_LEVEL));
     engine.reset();
     setGameKey((k) => k + 1);
   }, [engine]);
+
+  const handleBuyLife = useCallback(async () => {
+    if (!firebaseUser || userDiamonds < DIAMOND_PER_LIFE) return;
+    const success = await buyExtraLife(firebaseUser.uid);
+    if (success) {
+      // Add a life back to the engine
+      engine.resume();
+    }
+  }, [firebaseUser, userDiamonds, engine]);
 
   return (
     <div
@@ -82,7 +127,11 @@ export function GameShell({
           definition={definition}
           level={currentLevel}
           difficulty={difficulty ?? engine.difficulty}
-          onStart={() => engine.startCountdown()}
+          coinCost={coinCost}
+          canAfford={canAfford}
+          userCoins={userCoins}
+          deductingCoins={deductingCoins}
+          onStart={coinCost > 0 ? handlePayAndStart : () => engine.startCountdown()}
           onBack={onExit}
         />
       )}
@@ -123,6 +172,35 @@ export function GameShell({
             />
           )}
         </>
+      )}
+
+      {/* ── Failed with option to buy life ── */}
+      {engine.state === 'failed' && engine.lives <= 0 && definition.supportsLives && userDiamonds >= DIAMOND_PER_LIFE && (
+        <div className="absolute inset-0 bg-black/50 z-[60] flex items-center justify-center">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-surface rounded-2xl p-6 mx-4 max-w-sm w-full text-center shadow-xl"
+          >
+            <p className="text-lg font-bold text-text-primary mb-2">Out of Lives!</p>
+            <p className="text-sm text-text-secondary mb-4">
+              Use diamonds to get an extra life and continue playing.
+            </p>
+            <div className="flex items-center justify-center gap-1.5 mb-5">
+              <DiamondIcon size={18} className="text-accent" />
+              <span className="text-sm font-bold text-accent">{DIAMOND_PER_LIFE} Diamonds</span>
+            </div>
+            <div className="space-y-2">
+              <Button className="w-full" onClick={handleBuyLife}>
+                <DiamondIcon size={16} className="mr-1.5" />
+                Buy Extra Life
+              </Button>
+              <Button variant="secondary" className="w-full" onClick={onExit}>
+                End Game
+              </Button>
+            </div>
+          </motion.div>
+        </div>
       )}
 
       {/* ── Results / Saving / Rewards ── */}
@@ -251,19 +329,27 @@ function GameLoadingScreen({ definition, level }: { definition: GameDefinition; 
 }
 
 // ══════════════════════════════════════════════
-// Premium Instructions Screen
+// Premium Instructions Screen (with coin cost)
 // ══════════════════════════════════════════════
 
 function GameInstructionsScreen({
   definition,
   level,
   difficulty,
+  coinCost,
+  canAfford,
+  userCoins,
+  deductingCoins,
   onStart,
   onBack,
 }: {
   definition: GameDefinition;
   level: number;
   difficulty: GameDifficulty;
+  coinCost: number;
+  canAfford: boolean;
+  userCoins: number;
+  deductingCoins: boolean;
   onStart: () => void;
   onBack: () => void;
 }) {
@@ -360,12 +446,12 @@ function GameInstructionsScreen({
           </div>
         </motion.div>
 
-        {/* Rewards Preview */}
+        {/* Rewards Preview + Cost */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
-          className="flex items-center gap-5 mb-8 text-xs text-text-tertiary"
+          className="flex items-center gap-5 mb-4 text-xs text-text-tertiary"
         >
           <span className="flex items-center gap-1">
             <LightningIcon size={14} className="text-warning" />
@@ -383,6 +469,28 @@ function GameInstructionsScreen({
           )}
         </motion.div>
 
+        {/* Coin cost indicator */}
+        {coinCost > 0 && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.55 }}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-xl mb-6 text-sm font-medium',
+              canAfford
+                ? 'bg-amber-500/10 border border-amber-500/20 text-amber-600'
+                : 'bg-red-500/10 border border-red-500/20 text-red-500',
+            )}
+          >
+            <CoinIcon size={16} className={canAfford ? 'text-amber-500' : 'text-red-400'} />
+            {canAfford ? (
+              <span>Costs <strong>{coinCost}</strong> coins to play (You have {userCoins})</span>
+            ) : (
+              <span>Need <strong>{coinCost}</strong> coins (You have {userCoins})</span>
+            )}
+          </motion.div>
+        )}
+
         {/* Animated Start Button */}
         <motion.div
           initial={{ y: 10, opacity: 0 }}
@@ -394,12 +502,15 @@ function GameInstructionsScreen({
             className={cn(
               'min-w-[220px] h-14 text-base font-bold shadow-lg',
               'relative overflow-hidden',
+              (!canAfford && coinCost > 0) && 'opacity-50 cursor-not-allowed',
             )}
             style={{
               backgroundColor: definition.accentColor,
               boxShadow: `0 8px 24px ${definition.accentColor}30`,
             }}
             onClick={onStart}
+            disabled={(!canAfford && coinCost > 0) || deductingCoins}
+            isLoading={deductingCoins}
           >
             {/* Shimmer effect */}
             <motion.div
@@ -408,10 +519,16 @@ function GameInstructionsScreen({
               transition={{ duration: 2, repeat: Infinity, repeatDelay: 1, ease: 'easeInOut' }}
             />
             <span className="relative flex items-center gap-2">
-              Start Level {level}
+              {coinCost > 0 && <CoinIcon size={18} />}
+              {coinCost > 0 ? `Play Level ${level} (${coinCost} coins)` : `Start Level ${level}`}
               <ChevronRight className="h-5 w-5" />
             </span>
           </Button>
+          {!canAfford && coinCost > 0 && (
+            <p className="text-xs text-red-400 mt-2 text-center">
+              Play more games to earn coins!
+            </p>
+          )}
         </motion.div>
       </div>
     </div>

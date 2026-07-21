@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+
 import { motion } from 'framer-motion';
 import { Star, RotateCcw, ChevronRight, Zap, Trophy, ArrowRight } from 'lucide-react';
 import type { GameDefinition, GameEngine, ScoreResult, RewardResult } from '../types';
@@ -40,17 +40,8 @@ export function ResultScreen({
   const isSaving = engine.state === 'saving';
 
   // Auto-trigger save when results are displayed
-  useEffect(() => {
-    if (engine.state === 'results' && scoreResult && rewardResult) {
-      const timeout = setTimeout(() => {
-        // Transition to saving (handled by engine)
-        if (engine.state === 'results') {
-          (engine as GameEngine & { complete: () => void }).complete?.();
-        }
-      }, 500);
-      return () => clearTimeout(timeout);
-    }
-  }, [engine, scoreResult, rewardResult]);
+  // The engine handles results → saving transition automatically
+  // We no longer call engine.complete() here as that's an invalid transition from 'results'
 
   if (isLoading) {
     return (

@@ -2,14 +2,16 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { Lock, ChevronRight, Clock } from 'lucide-react';
+import { Lock, ChevronRight, Clock, Coins } from 'lucide-react';
 import { Modal } from '@/components/ui/modal';
 import { Badge } from '@/components/ui/badge';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { WORLDS } from '@/lib/constants';
 import { getGamesForWorld, getWorldProgress, isWorldUnlocked, WORLD_IMAGES } from '@/lib/worlds';
-import { formatSkillLabel, getGameLevelProgress } from '@/lib/game-config';
+import { formatSkillLabel, getGameLevelProgress, MAX_GAME_LEVEL } from '@/lib/game-config';
 import { GameIcon, WorldIllustration } from '@/components/games/game-icon';
+import { CoinIcon } from '@/components/illustrations/icons';
+import { getGameCoinCost } from '@/engine/economy';
 import { useAuthStore } from '@/stores/auth-store';
 import { cn } from '@/lib/utils';
 
@@ -81,6 +83,8 @@ export function WorldGamesPanel({ worldSlug, playerLevel, onClose }: WorldGamesP
               const highest = arenaProfile?.gameLevels?.[game.slug] ?? 0;
               const levelProgress = getGameLevelProgress(highest);
               const durationMin = Math.max(1, Math.ceil(game.defaultDurationSec / 60));
+              const nextLevel = Math.min(highest + 1, MAX_GAME_LEVEL);
+              const nextCoinCost = getGameCoinCost(nextLevel);
 
               return (
                 <Link
@@ -103,12 +107,20 @@ export function WorldGamesPanel({ worldSlug, playerLevel, onClose }: WorldGamesP
                         <Clock className="h-3 w-3" />
                         {durationMin} min
                       </span>
+                      {nextCoinCost > 0 ? (
+                        <span className="text-[10px] text-amber-500 flex items-center gap-0.5 font-medium">
+                          <CoinIcon size={10} className="text-amber-500" />
+                          {nextCoinCost}
+                        </span>
+                      ) : (
+                        <Badge variant="success">Free</Badge>
+                      )}
                     </div>
                     <div className="mt-2">
                       <ProgressBar value={levelProgress} size="sm" />
                       <p className="text-[10px] text-text-tertiary mt-0.5">
-                        Level {Math.min(highest + 1, 3)}/3
-                        {highest >= 3 ? ' · Complete' : ''}
+                        Level {nextLevel}/{MAX_GAME_LEVEL}
+                        {highest >= MAX_GAME_LEVEL ? ' · Complete' : ''}
                       </p>
                     </div>
                   </div>

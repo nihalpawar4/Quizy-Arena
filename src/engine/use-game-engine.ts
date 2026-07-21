@@ -210,8 +210,9 @@ export function useGameEngine(options: UseGameEngineOptions): GameEngine & {
     }
 
     if (state === 'results') {
-      // Auto-save after a brief display pause (user sees result screen)
-      // Save is triggered when ResultScreen calls transitionTo('saving')
+      // Auto-save after a brief display pause
+      const timeout = setTimeout(() => transitionTo('saving'), 500);
+      return () => clearTimeout(timeout);
     }
 
     if (state === 'saving') {

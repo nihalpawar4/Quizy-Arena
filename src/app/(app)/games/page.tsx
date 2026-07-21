@@ -44,7 +44,12 @@ function GamesPageContent() {
   const [selectedWorld, setSelectedWorld] = useState<string | null>(worldParam);
 
   const userProfile = useAuthStore((s) => s.userProfile);
-  const globalLevel = levelFromXp(userProfile?.globalXp ?? 0);
+  const arenaProfile = useAuthStore((s) => s.arenaProfile);
+  const globalLevel = Math.max(
+    levelFromXp(userProfile?.globalXp ?? 0),
+    arenaProfile?.arenaLevel ?? 1,
+    levelFromXp(arenaProfile?.arenaXp ?? 0),
+  );
   const unlockedWorlds = getUnlockedWorldSlugs(globalLevel);
 
   useEffect(() => {
@@ -179,14 +184,13 @@ function toDiscoverGame(def: ReturnType<typeof getAllGameDefinitions>[number]) {
 }
 
 function DiscoverView({ playerLevel, unlockedWorlds }: { playerLevel: number; unlockedWorlds: string[] }) {
-  const training = ALL_GAMES.filter((g) => g.worldSlug === 'training-camp').map(toDiscoverGame);
-  const forest = ALL_GAMES.filter((g) => g.worldSlug === 'forest-of-focus').map(toDiscoverGame);
-  const playable = [...training, ...forest];
+  const allPlayable = ALL_GAMES.map(toDiscoverGame);
 
   const categories = [
-    { label: 'Popular Today', icon: Zap, games: playable.slice(0, 3) },
-    { label: 'Quick Games', icon: Clock, games: [playable[1], playable[0]].filter(Boolean) },
-    { label: 'Train Your Brain', icon: BrainIcon, games: [playable[0], playable[2]].filter(Boolean) },
+    { label: 'Popular Today', icon: Zap, games: allPlayable.slice(0, 4) },
+    { label: 'Quick Games', icon: Clock, games: allPlayable.filter((g) => g.time.startsWith('1') || g.time.startsWith('2')).slice(0, 4) },
+    { label: 'Train Your Brain', icon: BrainIcon, games: allPlayable.slice(3, 7) },
+    { label: 'All Games', icon: LayoutGrid, games: allPlayable },
   ];
 
   return (
@@ -209,29 +213,31 @@ function DiscoverView({ playerLevel, unlockedWorlds }: { playerLevel: number; un
         </section>
       ))}
 
-      <section>
-        <div className="flex items-center gap-2 mb-4">
-          <Lock size={16} className="text-text-tertiary" />
-          <h2 className="arena-section-title text-sm">Coming Soon</h2>
-        </div>
-        <div className="flex gap-3 overflow-x-auto arena-scroll-hidden -mx-4 px-4">
-          {UPCOMING_GAMES.map((game) => (
-            <DiscoverGameCard
-              key={game.slug}
-              game={{
-                name: game.title,
-                slug: game.slug,
-                iconKey: game.iconKey,
-                color: game.color,
-                skill: game.skill,
-                time: game.time,
-              }}
-              locked
-              unlockLevel={game.unlockLevel}
-            />
-          ))}
-        </div>
-      </section>
+      {UPCOMING_GAMES.length > 0 && (
+        <section>
+          <div className="flex items-center gap-2 mb-4">
+            <Lock size={16} className="text-text-tertiary" />
+            <h2 className="arena-section-title text-sm">Coming Soon</h2>
+          </div>
+          <div className="flex gap-3 overflow-x-auto arena-scroll-hidden -mx-4 px-4">
+            {UPCOMING_GAMES.map((game) => (
+              <DiscoverGameCard
+                key={game.slug}
+                game={{
+                  name: game.title,
+                  slug: game.slug,
+                  iconKey: game.iconKey,
+                  color: game.color,
+                  skill: game.skill,
+                  time: game.time,
+                }}
+                locked
+                unlockLevel={game.unlockLevel}
+              />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
