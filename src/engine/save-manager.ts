@@ -4,9 +4,8 @@
  * Single save pipeline for every game.
  * Atomically updates user profile, arena profile, game levels, XP, coins, and skills.
  *
- * Uses updateDoc / batch.update with FieldPaths so nested dot notation
- * (like `gameLevels.speed-math` and `personalBests.speed-math`)
- * correctly targets map fields instead of creating invalid top-level keys.
+ * Uses `set` with `{ merge: true }` and explicit map objects for `gameLevels` and `personalBests`
+ * so nested properties merge safely regardless of whether the profile document already existed.
  */
 
 import type { SavePayload, RewardResult, GameDefinition } from './types';
@@ -18,7 +17,6 @@ import {
   increment,
   documentExists,
   setDocument,
-  updateDocument,
 } from '@/lib/firebase/firestore';
 import { enqueueOffline, getUnsyncedItems, markSynced, cleanQueue, isDuplicate } from './offline-queue';
 import { validateSession, recordSessionTimestamp } from './anti-cheat';
@@ -60,7 +58,7 @@ export async function saveGameSession(input: SaveInput): Promise<boolean> {
       await writeBatch(input);
       return true;
     } catch (error) {
-      console.warn('[SaveManager] Online save failed, falling back to individual writes:', error);
+      console.warn('[SaveManager] Online batch save failed, falling back to individual writes:', error);
       try {
         await fallbackSave(input);
         return true;
@@ -106,9 +104,7 @@ export async function processOfflineQueue(
 }
 
 /**
- * Write all critical documents in ONE atomic Firestore batch.
- * Uses batch.update() so dot-notation field paths (e.g. `gameLevels.speed-math`)
- * update nested map objects properly.
+ * Write all critical documents in ONE atomic Firestore batch using set(..., { merge: true }).
  */
 async function writeBatch(input: SaveInput): Promise<void> {
   const { payload, rewards } = input;
@@ -123,9 +119,10 @@ async function writeBatch(input: SaveInput): Promise<void> {
   const levelCompleted = payload.metadata?.levelCompleted === true;
   const highestLevel = (payload.metadata?.highestLevel as number) ?? payload.level;
 
-  // 1. arena_profiles/{uid} — batch.update handles field paths like gameLevels.slug
+  // 1. arena_profiles/{uid}
   const arenaRef = getDocRef('arena_profiles', payload.userId);
   const arenaUpdate: Record<string, unknown> = {
+    uid: payload.userId,
     arenaXp: increment(rewards.xpEarned),
     arenaLevel: rewards.newArenaLevel,
     brainScore: rewards.newBrainScore,
@@ -139,7 +136,7 @@ async function writeBatch(input: SaveInput): Promise<void> {
   if (levelCompleted) {
     arenaUpdate.gamesWon = increment(1);
     if (highestLevel >= 1) {
-      arenaUpdate[`gameLevels.${payload.gameSlug}`] = highestLevel;
+      arenaUpdate.gameLevels = { [payload.gameSlug]: highestLevel };
     }
   }
 
@@ -153,10 +150,10 @@ async function writeBatch(input: SaveInput): Promise<void> {
   }
 
   if (payload.isPersonalBest) {
-    arenaUpdate[`personalBests.${payload.gameSlug}`] = payload.score;
+    arenaUpdate.personalBests = { [payload.gameSlug]: payload.score };
   }
 
-  batch.update(arenaRef, arenaUpdate);
+  batch.set(arenaRef, arenaUpdate, { merge: true } as never);
 
   // 2. users/{uid} — update coins, diamonds, globalXp, globalLevel, and 10% arena XP sync
   const quizyXpSync = Math.floor(rewards.newArenaXp * 0.1);
@@ -171,7 +168,7 @@ async function writeBatch(input: SaveInput): Promise<void> {
     lastActiveAt: serverTimestamp(),
   };
 
-  batch.update(userRef, userUpdate);
+  batch.set(userRef, userUpdate, { merge: true } as never);
 
   // 3. arena_sessions/{sessionId} — session log
   const sessionRef = getDocRef('arena_sessions', payload.sessionId);
@@ -209,6 +206,7 @@ async function fallbackSave(input: SaveInput): Promise<void> {
 
   // 1. Update arena_profiles
   const arenaUpdate: Record<string, unknown> = {
+    uid: payload.userId,
     arenaXp: increment(rewards.xpEarned),
     arenaLevel: rewards.newArenaLevel,
     brainScore: rewards.newBrainScore,
@@ -222,7 +220,7 @@ async function fallbackSave(input: SaveInput): Promise<void> {
   if (levelCompleted) {
     arenaUpdate.gamesWon = increment(1);
     if (highestLevel >= 1) {
-      arenaUpdate[`gameLevels.${payload.gameSlug}`] = highestLevel;
+      arenaUpdate.gameLevels = { [payload.gameSlug]: highestLevel };
     }
   }
 
@@ -232,14 +230,14 @@ async function fallbackSave(input: SaveInput): Promise<void> {
   }
 
   if (payload.isPersonalBest) {
-    arenaUpdate[`personalBests.${payload.gameSlug}`] = payload.score;
+    arenaUpdate.personalBests = { [payload.gameSlug]: payload.score };
   }
 
-  await updateDocument('arena_profiles', payload.userId, arenaUpdate);
+  await setDocument('arena_profiles', payload.userId, arenaUpdate, { merge: true } as never);
 
   // 2. Update users
   const quizyXpSync = Math.floor(rewards.newArenaXp * 0.1);
-  await updateDocument('users', payload.userId, {
+  await setDocument('users', payload.userId, {
     globalXp: rewards.newGlobalXp,
     globalLevel: rewards.newGlobalLevel,
     coins: increment(payload.coinsEarned),
@@ -247,7 +245,7 @@ async function fallbackSave(input: SaveInput): Promise<void> {
     xp: quizyXpSync,
     updatedAt: serverTimestamp(),
     lastActiveAt: serverTimestamp(),
-  });
+  }, { merge: true } as never);
 }
 
 /**
@@ -258,6 +256,7 @@ async function writeBatchFromPayload(payload: SavePayload): Promise<void> {
   const highestLevel = (payload.metadata?.highestLevel as number) ?? payload.level;
 
   const arenaUpdate: Record<string, unknown> = {
+    uid: payload.userId,
     arenaXp: increment(payload.xpEarned),
     gamesPlayed: increment(1),
     totalPlayTimeSec: increment(payload.durationSec),
@@ -268,7 +267,7 @@ async function writeBatchFromPayload(payload: SavePayload): Promise<void> {
   if (levelCompleted) {
     arenaUpdate.gamesWon = increment(1);
     if (highestLevel >= 1) {
-      arenaUpdate[`gameLevels.${payload.gameSlug}`] = highestLevel;
+      arenaUpdate.gameLevels = { [payload.gameSlug]: highestLevel };
     }
   }
 
@@ -277,13 +276,13 @@ async function writeBatchFromPayload(payload: SavePayload): Promise<void> {
     arenaUpdate[fieldName] = increment(delta as number);
   }
 
-  await updateDocument('arena_profiles', payload.userId, arenaUpdate);
+  await setDocument('arena_profiles', payload.userId, arenaUpdate, { merge: true } as never);
 
-  await updateDocument('users', payload.userId, {
+  await setDocument('users', payload.userId, {
     globalXp: increment(payload.xpEarned),
     coins: increment(payload.coinsEarned),
     diamonds: increment(payload.diamondsEarned),
     xp: increment(Math.floor(payload.xpEarned * 0.1)),
     updatedAt: serverTimestamp(),
-  });
+  }, { merge: true } as never);
 }

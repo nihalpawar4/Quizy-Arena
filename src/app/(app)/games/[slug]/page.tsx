@@ -41,7 +41,11 @@ function GamePlayContent() {
   const [entry, setEntry] = useState<GameRegistryEntry | undefined>(undefined);
   const [isReady, setIsReady] = useState(false);
 
-  const globalLevel = levelFromXp(userProfile?.globalXp ?? 0);
+  const globalLevel = Math.max(
+    levelFromXp(userProfile?.globalXp ?? 0),
+    arenaProfile?.arenaLevel ?? 1,
+    levelFromXp(arenaProfile?.arenaXp ?? 0),
+  );
 
   useEffect(() => {
     const gameEntry = getGameEntry(params.slug);
