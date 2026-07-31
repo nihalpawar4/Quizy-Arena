@@ -39,12 +39,3 @@ export function getGamesForWorld(worldSlug: string) {
     .filter((g) => g.worldSlug === worldSlug)
     .sort((a, b) => a.sortOrderInWorld - b.sortOrderInWorld);
 }
-
-export const WORLD_IMAGES: Record<string, string> = {
-  'training-camp': '/illustrations/world-training-camp.png',
-  'forest-of-focus': '/illustrations/world-forest.png',
-  'ice-kingdom': '/illustrations/world-ice-kingdom.png',
-  'desert-of-logic': '/illustrations/world-desert.png',
-  'volcano-peak': '/illustrations/world-volcano.png',
-  'cyber-city': '/illustrations/world-cyber.png',
-};

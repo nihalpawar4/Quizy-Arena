@@ -33,13 +33,13 @@ export type SkillId = (typeof SKILLS)[number]['id'];
 // ── Worlds ──
 export const WORLDS = [
   { slug: 'training-camp', name: 'Training Camp', unlockLevel: 1 },
-  { slug: 'forest-of-focus', name: 'Forest of Focus', unlockLevel: 3 },
-  { slug: 'ice-kingdom', name: 'Ice Kingdom', unlockLevel: 6 },
-  { slug: 'desert-of-logic', name: 'Desert of Logic', unlockLevel: 10 },
-  { slug: 'volcano-peak', name: 'Volcano Peak', unlockLevel: 15 },
-  { slug: 'cyber-city', name: 'Cyber City', unlockLevel: 20 },
-  { slug: 'sky-kingdom', name: 'Sky Kingdom', unlockLevel: 28 },
-  { slug: 'champion-castle', name: 'Champion Castle', unlockLevel: 35 },
+  { slug: 'forest-of-focus', name: 'Forest of Focus', unlockLevel: 5 },
+  { slug: 'ice-kingdom', name: 'Ice Kingdom', unlockLevel: 10 },
+  { slug: 'desert-of-logic', name: 'Desert of Logic', unlockLevel: 16 },
+  { slug: 'volcano-peak', name: 'Volcano Peak', unlockLevel: 23 },
+  { slug: 'cyber-city', name: 'Cyber City', unlockLevel: 30 },
+  { slug: 'sky-kingdom', name: 'Sky Kingdom', unlockLevel: 38 },
+  { slug: 'champion-castle', name: 'Champion Castle', unlockLevel: 46 },
 ] as const;
 
 // ── Upcoming / locked games (shown in Discover) ──

@@ -26,7 +26,7 @@ export const logicSprintDefinition: GameDefinition = {
   baseXp: 110,
   baseCoinReward: 28,
   diamondChance: 0.12,
-  unlockLevel: 3,
+  unlockLevel: 5,
   unlockWorldSlug: 'forest-of-focus',
   isOfflineCapable: true,
   isMultiplayerCapable: false,

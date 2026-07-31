@@ -37,5 +37,5 @@ export async function createArenaProfile(uid: string, globalXp = 0): Promise<voi
     updatedAt: serverTimestamp(),
   };
 
-  await setDocument('arena_profiles', uid, arenaDoc);
+  await setDocument('arena_profiles', uid, arenaDoc, { merge: true });
 }

@@ -31,7 +31,7 @@ export const lavaLogicDefinition: GameDefinition = {
   baseCoinReward: 40,
   diamondChance: 0.18,
 
-  unlockLevel: 15,
+  unlockLevel: 23,
   unlockWorldSlug: 'volcano-peak',
 
   isOfflineCapable: true,

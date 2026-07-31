@@ -31,19 +31,19 @@ registerGame({
 import { memoryGroveDefinition } from './memory-grove/definition';
 registerGame({
   definition: memoryGroveDefinition,
-  component: lazy(() => import('./memory-match/game')),
+  component: lazy(() => import('./memory-grove/game')),
 });
 
 import { logicSprintDefinition } from './logic-sprint/definition';
 registerGame({
   definition: logicSprintDefinition,
-  component: lazy(() => import('./speed-math/game')),
+  component: lazy(() => import('./logic-sprint/game')),
 });
 
 import { patternTrailDefinition } from './pattern-trail/definition';
 registerGame({
   definition: patternTrailDefinition,
-  component: lazy(() => import('./pattern-recall/game')),
+  component: lazy(() => import('./pattern-trail/game')),
 });
 
 // ── Ice Kingdom ──

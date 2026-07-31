@@ -17,11 +17,17 @@ import {
   increment,
   documentExists,
   setDocument,
+  invalidateCollection,
 } from '@/lib/firebase/firestore';
 import { enqueueOffline, getUnsyncedItems, markSynced, cleanQueue, isDuplicate } from './offline-queue';
 import { validateSession, recordSessionTimestamp } from './anti-cheat';
 import { getUnlockedWorldSlugs } from '@/lib/worlds';
 import { createArenaProfile } from '@/lib/firebase/arena-profile';
+import {
+  getDailyChallengeSlug,
+  getTodayDateKey,
+  DAILY_CHALLENGE_LEVELS_REQUIRED,
+} from '@/lib/daily-challenge';
 
 interface SaveInput {
   payload: SavePayload;
@@ -138,6 +144,17 @@ async function writeBatch(input: SaveInput): Promise<void> {
     if (highestLevel >= 1) {
       arenaUpdate.gameLevels = { [payload.gameSlug]: highestLevel };
     }
+
+    // Daily challenge completion: if this game is today's daily slug
+    // and the player just completed the required number of levels
+    const todayDailySlug = getDailyChallengeSlug();
+    if (
+      payload.gameSlug === todayDailySlug &&
+      highestLevel >= DAILY_CHALLENGE_LEVELS_REQUIRED
+    ) {
+      arenaUpdate.dailyChallengeDate = getTodayDateKey();
+      arenaUpdate.dailyChallengeSlug = todayDailySlug;
+    }
   }
 
   if (rewards.newStreakCount > 0) {
@@ -153,7 +170,7 @@ async function writeBatch(input: SaveInput): Promise<void> {
     arenaUpdate.personalBests = { [payload.gameSlug]: payload.score };
   }
 
-  batch.set(arenaRef, arenaUpdate, { merge: true } as never);
+  batch.set(arenaRef, arenaUpdate, { merge: true });
 
   // 2. users/{uid} — update coins, diamonds, globalXp, globalLevel, and 10% arena XP sync
   const quizyXpSync = Math.floor(rewards.newArenaXp * 0.1);
@@ -168,7 +185,7 @@ async function writeBatch(input: SaveInput): Promise<void> {
     lastActiveAt: serverTimestamp(),
   };
 
-  batch.set(userRef, userUpdate, { merge: true } as never);
+  batch.set(userRef, userUpdate, { merge: true });
 
   // 3. arena_sessions/{sessionId} — session log
   const sessionRef = getDocRef('arena_sessions', payload.sessionId);
@@ -194,6 +211,11 @@ async function writeBatch(input: SaveInput): Promise<void> {
   });
 
   await batch.commit();
+
+  // Invalidate caches so real-time listeners and subsequent reads see updated data
+  invalidateCollection('arena_profiles');
+  invalidateCollection('users');
+  invalidateCollection('arena_sessions');
 }
 
 /**
@@ -233,7 +255,7 @@ async function fallbackSave(input: SaveInput): Promise<void> {
     arenaUpdate.personalBests = { [payload.gameSlug]: payload.score };
   }
 
-  await setDocument('arena_profiles', payload.userId, arenaUpdate, { merge: true } as never);
+  await setDocument('arena_profiles', payload.userId, arenaUpdate, { merge: true });
 
   // 2. Update users
   const quizyXpSync = Math.floor(rewards.newArenaXp * 0.1);
@@ -245,7 +267,11 @@ async function fallbackSave(input: SaveInput): Promise<void> {
     xp: quizyXpSync,
     updatedAt: serverTimestamp(),
     lastActiveAt: serverTimestamp(),
-  }, { merge: true } as never);
+  }, { merge: true });
+
+  // Invalidate caches for real-time updates
+  invalidateCollection('arena_profiles');
+  invalidateCollection('users');
 }
 
 /**
@@ -276,7 +302,7 @@ async function writeBatchFromPayload(payload: SavePayload): Promise<void> {
     arenaUpdate[fieldName] = increment(delta as number);
   }
 
-  await setDocument('arena_profiles', payload.userId, arenaUpdate, { merge: true } as never);
+  await setDocument('arena_profiles', payload.userId, arenaUpdate, { merge: true });
 
   await setDocument('users', payload.userId, {
     globalXp: increment(payload.xpEarned),
@@ -284,5 +310,5 @@ async function writeBatchFromPayload(payload: SavePayload): Promise<void> {
     diamonds: increment(payload.diamondsEarned),
     xp: increment(Math.floor(payload.xpEarned * 0.1)),
     updatedAt: serverTimestamp(),
-  }, { merge: true } as never);
+  }, { merge: true });
 }

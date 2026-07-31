@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useAuthStore } from '@/stores/auth-store';
 import { useRecentGames } from '@/hooks/use-recent-games';
 import { useDailyMissions } from '@/hooks/use-daily-missions';
@@ -23,7 +22,7 @@ import {
   isDailyChallengeCompleted,
   DAILY_CHALLENGE_REWARDS,
 } from '@/lib/daily-challenge';
-import { ACTIVE_WORLD_SLUGS, getGameLevelProgress } from '@/lib/game-config';
+import { ACTIVE_WORLD_SLUGS, getGameLevelProgress, getNextPlayLevel, MAX_GAME_LEVEL } from '@/lib/game-config';
 import {
   Swords,
   ChevronRight,
@@ -49,6 +48,7 @@ import {
   CoinIcon,
   DiamondIcon,
   CrownIcon,
+  TreasureIcon,
 } from '@/components/illustrations/icons';
 import { GameIcon } from '@/components/games/game-icon';
 import {
@@ -117,12 +117,16 @@ export default function HomePage() {
 
   const activeWorlds = WORLDS.filter((w) => (ACTIVE_WORLD_SLUGS as readonly string[]).includes(w.slug));
 
-  const defaultGames = Object.entries(GAME_META).slice(0, 3).map(([slug, meta]) => ({
-    slug,
-    meta,
-    subtitle: 'New',
-    progress: getGameLevelProgress(arenaProfile?.gameLevels?.[slug]),
-  }));
+  const defaultGames = Object.entries(GAME_META).slice(0, 3).map(([slug, meta]) => {
+    const highest = arenaProfile?.gameLevels?.[slug] ?? 0;
+    const nextLevel = getNextPlayLevel(highest);
+    return {
+      slug,
+      meta,
+      subtitle: highest >= MAX_GAME_LEVEL ? 'Complete' : `Level ${nextLevel}/${MAX_GAME_LEVEL}`,
+      progress: getGameLevelProgress(highest),
+    };
+  });
 
   return (
     <div className="space-y-5">
@@ -240,10 +244,11 @@ export default function HomePage() {
                   ? recentGames.map((game) => {
                       const meta = GAME_META[game.gameSlug] ?? { name: game.gameSlug, icon: BrainIcon, iconKey: 'brain' as const, color: '#3B82F6', skill: 'Brain' };
                       const highest = arenaProfile?.gameLevels?.[game.gameSlug] ?? 0;
+                      const nextLevel = getNextPlayLevel(highest);
                       return {
                         slug: game.gameSlug,
                         meta,
-                        subtitle: highest >= 3 ? 'Complete' : `Level ${Math.min(highest + 1, 3)}/3`,
+                        subtitle: highest >= MAX_GAME_LEVEL ? 'Complete' : `Level ${nextLevel}/${MAX_GAME_LEVEL}`,
                         progress: getGameLevelProgress(highest),
                       };
                     })
@@ -284,8 +289,13 @@ export default function HomePage() {
           {/* Today's reward */}
           <Link href="/rewards" className="block group">
             <div className="rounded-2xl bg-surface shadow-sm p-4 flex items-center gap-4 hover:bg-card-hover transition-colors">
-              <div className="h-14 w-14 rounded-xl overflow-hidden shrink-0 bg-amber-500/10 flex items-center justify-center">
-                <Image src="/illustrations/treasure-chest.png" alt="" width={48} height={48} className="h-10 w-10 object-contain" />
+              <div
+                className="h-14 w-14 rounded-xl shrink-0 flex items-center justify-center relative overflow-hidden"
+                style={{ background: 'linear-gradient(135deg, #F59E0B20, #D9770620)' }}
+              >
+                {/* Animated glow */}
+                <div className="absolute inset-0 bg-gradient-to-br from-amber-400/10 via-transparent to-orange-400/10 animate-pulse" />
+                <TreasureIcon size={28} className="text-amber-500 relative z-10" />
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-text-primary">Today&apos;s Reward</p>

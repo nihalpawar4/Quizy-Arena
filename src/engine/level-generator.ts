@@ -105,23 +105,28 @@ function getMemoryMatchConfig(level: number): DifficultyConfig {
 // ═══ SPEED MATH ═══
 
 function getSpeedMathConfig(level: number): DifficultyConfig {
+  // Level 1-3: numbers 1-20, only + and -
+  // Level 4-6: numbers up to 50, add ×, occasional 2-step
+  // Level 7-8: numbers up to 100, add ÷, 2-step problems
+  // Level 9-10: numbers up to 200, all 4 ops, 2-3 step problems
   const maxOperand = clamp(
-    Math.floor(15 + level * 4),
+    Math.floor(15 + (level - 1) * 20),
     15,
     200,
   );
 
-  let operatorCount = 2;
-  if (level >= 4) operatorCount = 3;
-  if (level >= 9) operatorCount = 4;
+  let operatorCount = 2; // + and -
+  if (level >= 4) operatorCount = 3; // add ×
+  if (level >= 7) operatorCount = 4; // add ÷
 
   const durationSec = clamp(
-    Math.floor(65 - level * 0.8),
+    Math.floor(65 - level * 1.5),
     35,
     65,
   );
 
-  const maxSteps = level >= 25 ? 3 : level >= 12 ? 2 : 1;
+  // Multi-step: 2 operations at level 5+, 2-3 at level 8+
+  const maxSteps = level >= 8 ? 3 : level >= 5 ? 2 : 1;
   const maxScore = clamp(600 + level * 30, 600, 2000);
 
   return {

@@ -72,9 +72,10 @@ export async function setDocument(
   collectionName: string,
   docId: string,
   data: Record<string, unknown>,
-  merge = false,
+  options?: { merge?: boolean },
 ): Promise<void> {
   try {
+    const merge = options?.merge ?? false;
     await setDoc(doc(getFirebaseDb(), collectionName, docId), data, { merge });
     // Invalidate cache for this document
     firebaseCache.invalidate(`${collectionName}:${docId}`);

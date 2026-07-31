@@ -1,13 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import Image from 'next/image';
-import { Lock, ChevronRight, Clock, Coins } from 'lucide-react';
+import { Lock, ChevronRight, Clock } from 'lucide-react';
 import { Modal } from '@/components/ui/modal';
 import { Badge } from '@/components/ui/badge';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { WORLDS } from '@/lib/constants';
-import { getGamesForWorld, getWorldProgress, isWorldUnlocked, WORLD_IMAGES } from '@/lib/worlds';
+import { getGamesForWorld, getWorldProgress, isWorldUnlocked } from '@/lib/worlds';
 import { formatSkillLabel, getGameLevelProgress, MAX_GAME_LEVEL } from '@/lib/game-config';
 import { GameIcon, WorldIllustration } from '@/components/games/game-icon';
 import { CoinIcon } from '@/components/illustrations/icons';
@@ -32,7 +31,7 @@ export function WorldGamesPanel({ worldSlug, playerLevel, onClose }: WorldGamesP
   const unlocked = isWorldUnlocked(worldSlug, playerLevel);
   const games = getGamesForWorld(worldSlug);
   const progress = getWorldProgress(playerLevel, worldSlug);
-  const worldImg = WORLD_IMAGES[worldSlug];
+
 
   return (
     <Modal
@@ -48,13 +47,7 @@ export function WorldGamesPanel({ worldSlug, playerLevel, onClose }: WorldGamesP
       className="max-w-lg"
     >
       <div className="flex items-center gap-4 mb-5 p-4 rounded-xl bg-card-hover">
-        {worldImg ? (
-          <div className="h-14 w-14 rounded-xl overflow-hidden shrink-0">
-            <Image src={worldImg} alt={world.name} width={56} height={56} className="h-full w-full object-cover" />
-          </div>
-        ) : (
-          <WorldIllustration slug={worldSlug} size={56} />
-        )}
+        <WorldIllustration slug={worldSlug} size={56} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className="text-sm font-semibold text-text-primary">{world.name}</span>
@@ -161,7 +154,7 @@ export function WorldCard({ worldSlug, playerLevel, onSelect, compact }: WorldCa
   if (!world) return null;
 
   const unlocked = isWorldUnlocked(worldSlug, playerLevel);
-  const worldImg = WORLD_IMAGES[worldSlug];
+
 
   return (
     <button
@@ -183,13 +176,7 @@ export function WorldCard({ worldSlug, playerLevel, onSelect, compact }: WorldCa
       >
         {compact ? (
           <>
-            {worldImg ? (
-              <div className="h-12 w-12 mx-auto rounded-lg overflow-hidden mb-2">
-                <Image src={worldImg} alt={world.name} width={48} height={48} className="h-full w-full object-cover" />
-              </div>
-            ) : (
-              <WorldIllustration slug={worldSlug} size={48} className="mx-auto mb-2" />
-            )}
+            <WorldIllustration slug={worldSlug} size={48} className="mx-auto mb-2" />
             <p className="text-xs font-semibold text-text-primary truncate">{world.name}</p>
             <div className="flex items-center justify-center gap-1 mt-1">
               {unlocked ? (
@@ -204,13 +191,7 @@ export function WorldCard({ worldSlug, playerLevel, onSelect, compact }: WorldCa
           </>
         ) : (
           <>
-            {worldImg ? (
-              <div className="h-14 w-14 rounded-xl overflow-hidden shrink-0">
-                <Image src={worldImg} alt={world.name} width={56} height={56} className="h-full w-full object-cover" />
-              </div>
-            ) : (
-              <WorldIllustration slug={worldSlug} size={56} />
-            )}
+            <WorldIllustration slug={worldSlug} size={56} />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-text-primary">{world.name}</p>
               <p className="text-xs text-text-tertiary mt-0.5">

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import Image from 'next/image';
 import { Gift, ChevronRight, Check, Star } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -58,7 +57,7 @@ export default function RewardsPage() {
       if (result) {
         addToast({
           message: 'Daily Gift Claimed!',
-          description: `+${result.coins} Coins${result.diamonds > 0 ? `, +${result.diamonds} 💎` : ''} (Day ${result.streakDay})`,
+          description: `+${result.coins} Coins${result.diamonds > 0 ? `, +${result.diamonds} Diamonds` : ''} (Day ${result.streakDay})`,
           variant: 'success',
         });
         setCanClaim(false);
@@ -175,17 +174,13 @@ export default function RewardsPage() {
 
               return (
                 <div key={chest.id} className="w-40 shrink-0 rounded-2xl overflow-hidden bg-surface shadow-sm">
-                  <div
-                    className="h-24 flex items-center justify-center"
-                    style={{ background: `linear-gradient(135deg, ${c.bgFrom}, ${c.bgTo})` }}
-                  >
-                    <Image
-                      src="/illustrations/treasure-chest.png"
-                      alt={chest.type}
-                      width={64}
-                      height={64}
-                      className="h-16 w-16 object-contain"
-                    />
+                  <div className="h-24 flex items-center justify-center">
+                    <div
+                      className="h-16 w-16 rounded-2xl flex items-center justify-center relative"
+                      style={{ background: `linear-gradient(135deg, ${c.bgFrom}80, ${c.bgTo}80)` }}
+                    >
+                      <TreasureIcon size={32} style={{ color: c.bgTo }} />
+                    </div>
                   </div>
                   <div className="p-3 text-center">
                     <p className="text-sm font-semibold text-text-primary capitalize">{chest.type} Chest</p>

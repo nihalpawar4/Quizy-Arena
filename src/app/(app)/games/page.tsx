@@ -2,7 +2,6 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { useSearchParams } from 'next/navigation';
 import { Map, LayoutGrid, Lock, Star, ChevronRight, Clock, Zap } from 'lucide-react';
 import { CardTitle } from '@/components/ui/card';
@@ -14,7 +13,6 @@ import { levelFromXp } from '@/lib/xp';
 import {
   getUnlockedWorldSlugs,
   getWorldProgress,
-  WORLD_IMAGES,
   getGamesForWorld,
 } from '@/lib/worlds';
 import { ACTIVE_WORLD_SLUGS, formatSkillLabel, getGameLevelProgress } from '@/lib/game-config';
@@ -111,7 +109,6 @@ function WorldMapView({
     <div className="space-y-3">
       {[...activeWorlds].reverse().map((world) => {
         const isUnlocked = unlockedWorlds.includes(world.slug);
-        const worldImg = WORLD_IMAGES[world.slug];
         const progress = getWorldProgress(playerLevel, world.slug);
         const games = getGamesForWorld(world.slug);
 
@@ -126,13 +123,7 @@ function WorldMapView({
             )}
           >
             <div className="flex items-center gap-4 p-4">
-              {worldImg ? (
-                <div className="h-14 w-14 rounded-xl overflow-hidden shrink-0">
-                  <Image src={worldImg} alt={world.name} width={56} height={56} className="h-full w-full object-cover" />
-                </div>
-              ) : (
-                <WorldIllustration slug={world.slug} size={56} />
-              )}
+              <WorldIllustration slug={world.slug} size={56} />
               <div className="flex-1 min-w-0">
                 <CardTitle>{world.name}</CardTitle>
                 <p className="text-xs text-text-tertiary mt-0.5">

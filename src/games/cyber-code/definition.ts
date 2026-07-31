@@ -31,7 +31,7 @@ export const cyberCodeDefinition: GameDefinition = {
   baseCoinReward: 40,
   diamondChance: 0.18,
 
-  unlockLevel: 20,
+  unlockLevel: 30,
   unlockWorldSlug: 'cyber-city',
 
   isOfflineCapable: true,

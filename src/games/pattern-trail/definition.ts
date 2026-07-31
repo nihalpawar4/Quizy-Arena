@@ -26,7 +26,7 @@ export const patternTrailDefinition: GameDefinition = {
   baseXp: 120,
   baseCoinReward: 30,
   diamondChance: 0.12,
-  unlockLevel: 3,
+  unlockLevel: 5,
   unlockWorldSlug: 'forest-of-focus',
   isOfflineCapable: true,
   isMultiplayerCapable: false,
