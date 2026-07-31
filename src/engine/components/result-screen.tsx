@@ -14,6 +14,7 @@ interface ResultScreenProps {
   definition: GameDefinition;
   engine: GameEngine;
   level: number;
+  maxLevel?: number;
   scoreResult: ScoreResult | null;
   rewardResult: RewardResult | null;
   onPlayAgain: () => void;
@@ -30,6 +31,7 @@ export function ResultScreen({
   definition,
   engine,
   level,
+  maxLevel = MAX_GAME_LEVEL,
   scoreResult,
   rewardResult,
   onPlayAgain,
@@ -193,18 +195,18 @@ export function ResultScreen({
           className="space-y-2 pt-2"
         >
           {/* Primary: Next Level */}
-          {level < MAX_GAME_LEVEL ? (
+          {level < maxLevel ? (
             <Button
               className="w-full"
               onClick={onNextLevel}
               isLoading={isSaving}
             >
               <ArrowRight className="h-4 w-4" />
-              Next Level ({level + 1}/{MAX_GAME_LEVEL})
+              Next Level ({level + 1}/{maxLevel})
             </Button>
           ) : (
             <Button className="w-full" onClick={onContinue} isLoading={isSaving}>
-              All Levels Complete
+              {maxLevel < MAX_GAME_LEVEL ? 'Challenge Complete' : 'All Levels Complete'}
               <ChevronRight className="h-4 w-4" />
             </Button>
           )}

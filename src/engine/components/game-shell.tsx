@@ -24,6 +24,7 @@ interface GameShellProps {
   GameComponent: React.LazyExoticComponent<React.ComponentType<GameComponentProps>>;
   difficulty?: GameDifficulty;
   initialLevel?: number;
+  maxLevel?: number;
   onExit: () => void;
 }
 
@@ -41,6 +42,7 @@ export function GameShell({
   GameComponent,
   difficulty,
   initialLevel = 1,
+  maxLevel = MAX_GAME_LEVEL,
   onExit,
 }: GameShellProps) {
   const [currentLevel, setCurrentLevel] = useState(initialLevel);
@@ -97,7 +99,7 @@ export function GameShell({
 
   const handleNextLevel = useCallback(() => {
     setCoinCheckPassed(false);
-    setCurrentLevel((l) => Math.min(l + 1, MAX_GAME_LEVEL));
+    setCurrentLevel((l) => Math.min(l + 1, maxLevel));
     engine.reset();
     setGameKey((k) => k + 1);
   }, [engine]);
@@ -212,6 +214,7 @@ export function GameShell({
           definition={definition}
           engine={engine}
           level={currentLevel}
+          maxLevel={maxLevel}
           scoreResult={engine.scoreResult}
           rewardResult={engine.rewardResult}
           onPlayAgain={handlePlayAgain}

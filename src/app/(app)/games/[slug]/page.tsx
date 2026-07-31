@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useState } from 'react';
 import { getGameEntry } from '@/engine/registry';
 import { GameShell } from '@/engine/components/game-shell';
@@ -9,6 +9,10 @@ import { useAuthStore } from '@/stores/auth-store';
 import { getNextPlayLevel } from '@/lib/game-config';
 import { levelFromXp } from '@/lib/xp';
 import { isWorldUnlocked } from '@/lib/worlds';
+import {
+  getDailyChallengeSlug,
+  DAILY_CHALLENGE_LEVELS_REQUIRED,
+} from '@/lib/daily-challenge';
 import type { GameRegistryEntry } from '@/engine/types';
 
 import '@/games/register';
@@ -47,6 +51,9 @@ function GamePlayContent() {
     levelFromXp(arenaProfile?.arenaXp ?? 0),
   );
 
+  // Detect if this game is today's daily challenge
+  const isDailyChallenge = params.slug === getDailyChallengeSlug();
+
   useEffect(() => {
     const gameEntry = getGameEntry(params.slug);
     if (!gameEntry) {
@@ -79,7 +86,8 @@ function GamePlayContent() {
       definition={entry.definition}
       GameComponent={entry.component}
       initialLevel={startLevel}
-      onExit={() => router.push('/games')}
+      maxLevel={isDailyChallenge ? DAILY_CHALLENGE_LEVELS_REQUIRED : undefined}
+      onExit={() => router.push(isDailyChallenge ? '/' : '/games')}
     />
   );
 }

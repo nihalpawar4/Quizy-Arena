@@ -39,7 +39,7 @@ export function AppShell({ children }: AppShellProps) {
         <TopBar />
 
         {/* Page Content */}
-        <main className="flex-1 pb-24 lg:pb-6">
+        <main className="flex-1 pb-28 lg:pb-6">
           <div className="max-w-7xl mx-auto px-4 py-4 lg:px-8 lg:py-5">
             {children}
           </div>
