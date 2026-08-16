@@ -3,7 +3,7 @@
 import { useCallback } from 'react';
 import { useAuthStore } from '@/stores/auth-store';
 import { useUIStore } from '@/stores/ui-store';
-import { updateDocument, serverTimestamp, documentExists, setDocument } from '@/lib/firebase/firestore';
+import { updateDocument, deleteDocument, serverTimestamp, documentExists, setDocument, claimNewDocument } from '@/lib/firebase/firestore';
 import { uploadAvatar } from '@/lib/firebase/storage';
 import { optimisticUpdate } from '@/lib/firebase/optimistic';
 import { classifyError } from '@/lib/firebase/firebase-error';
@@ -95,41 +95,29 @@ export function useProfile() {
       return false;
     }
 
-    // Check availability
-    try {
-      const taken = await documentExists('usernames', username);
-      if (taken) {
-        addToast({
-          message: 'Username taken',
-          description: 'Please choose a different username.',
-          variant: 'warning',
-        });
-        return false;
-      }
-    } catch (err) {
-      const classified = classifyError(err);
-      addToast({ message: classified.message, variant: 'error' });
-      return false;
-    }
-
     return optimisticUpdate<UserDocument | null>({
       previousValue: userProfile,
       optimisticValue: { ...userProfile, username },
       applyToStore: setUserProfile,
       firebaseWrite: async () => {
-        // Release old username
+        // Atomically claim the new username (fails if already taken)
+        const claimed = await claimNewDocument('usernames', username, {
+          uid,
+          createdAt: serverTimestamp(),
+        });
+        if (!claimed) {
+          throw new Error('Username is already taken');
+        }
+
+        // Release old username (actually delete it so it can be reused)
         if (userProfile.username) {
           try {
-            await updateDocument('usernames', userProfile.username, {});
+            await deleteDocument('usernames', userProfile.username);
           } catch {
             // Old username doc may not exist — safe to ignore
           }
         }
-        // Claim new username
-        await setDocument('usernames', username, {
-          uid,
-          createdAt: serverTimestamp(),
-        });
+
         // Update user doc
         await updateDocument('users', uid, {
           username,

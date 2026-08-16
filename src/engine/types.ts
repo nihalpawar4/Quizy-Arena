@@ -113,6 +113,7 @@ export type GameLifecycleState =
 export interface GameEngine {
   // ── State (read-only) ──
   state: GameLifecycleState;
+  sessionOutcome: 'completed' | 'failed' | null;
   score: number;
   timeRemaining: number;
   timeElapsed: number;

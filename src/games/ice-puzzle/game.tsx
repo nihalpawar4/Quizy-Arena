@@ -101,7 +101,7 @@ export default function IcePuzzleGame({ engine }: GameComponentProps) {
   );
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-4 gap-4">
+    <div className="flex-1 flex flex-col items-center justify-center p-4 gap-4 min-h-0">
       <div className="flex items-center gap-4 text-sm text-text-secondary">
         <span>Moves: <strong className="text-text-primary font-mono">{moveCount}</strong></span>
       </div>
@@ -116,7 +116,7 @@ export default function IcePuzzleGame({ engine }: GameComponentProps) {
             onClick={() => handleTileClick(idx)}
             disabled={value === 0 || engine.state !== 'playing'}
             className={cn(
-              'aspect-square rounded-xl text-lg font-bold transition-all select-none',
+              'aspect-square rounded-xl text-lg font-bold transition-all select-none touch-manipulation',
               'flex items-center justify-center',
               value === 0
                 ? 'bg-transparent'

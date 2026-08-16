@@ -92,10 +92,9 @@ const RETRYABLE: Set<FirebaseErrorCategory> = new Set([
 function extractCode(error: unknown): string | null {
   if (error && typeof error === 'object') {
     const e = error as Record<string, unknown>;
-    if (typeof e.code === 'string') return e.code;
-    // Some Firebase errors prefix with the service, e.g. "firestore/permission-denied"
     if (typeof e.code === 'string') {
-      const parts = (e.code as string).split('/');
+      // Strip service prefix if present (e.g. "firestore/permission-denied" → "permission-denied")
+      const parts = e.code.split('/');
       return parts[parts.length - 1];
     }
   }

@@ -17,8 +17,11 @@ import {
   increment,
   documentExists,
   setDocument,
+  updateDocument,
   invalidateCollection,
 } from '@/lib/firebase/firestore';
+import { skillIdToArenaField } from '@/lib/firebase/skill-fields';
+import { QUIZY_XP_SHARE } from '@/lib/game-economy';
 import { enqueueOffline, getUnsyncedItems, markSynced, cleanQueue, isDuplicate } from './offline-queue';
 import { validateSession, recordSessionTimestamp } from './anti-cheat';
 import { getUnlockedWorldSlugs } from '@/lib/worlds';
@@ -33,6 +36,8 @@ interface SaveInput {
   payload: SavePayload;
   rewards: RewardResult;
   definition: GameDefinition;
+  /** Current gameLevels from arena profile for world-unlock projection */
+  currentGameLevels?: Record<string, number>;
 }
 
 /**
@@ -125,6 +130,17 @@ async function writeBatch(input: SaveInput): Promise<void> {
   const levelCompleted = payload.metadata?.levelCompleted === true;
   const highestLevel = (payload.metadata?.highestLevel as number) ?? payload.level;
 
+  // Project gameLevels as they will be after this save, for world-unlock gating
+  const projectedGameLevels: Record<string, number> = {
+    ...(input.currentGameLevels ?? {}),
+  };
+  if (levelCompleted && highestLevel >= 1) {
+    projectedGameLevels[payload.gameSlug] = Math.max(
+      projectedGameLevels[payload.gameSlug] ?? 0,
+      highestLevel,
+    );
+  }
+
   // 1. arena_profiles/{uid}
   const arenaRef = getDocRef('arena_profiles', payload.userId);
   const arenaUpdate: Record<string, unknown> = {
@@ -136,13 +152,13 @@ async function writeBatch(input: SaveInput): Promise<void> {
     totalPlayTimeSec: increment(payload.durationSec),
     lastPlayedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-    unlockedWorldSlugs: getUnlockedWorldSlugs(rewards.newGlobalLevel),
+    unlockedWorldSlugs: getUnlockedWorldSlugs(projectedGameLevels),
   };
 
   if (levelCompleted) {
     arenaUpdate.gamesWon = increment(1);
     if (highestLevel >= 1) {
-      arenaUpdate.gameLevels = { [payload.gameSlug]: highestLevel };
+      arenaUpdate[`gameLevels.${payload.gameSlug}`] = highestLevel;
     }
 
     // Daily challenge completion: if this game is today's daily slug
@@ -162,25 +178,28 @@ async function writeBatch(input: SaveInput): Promise<void> {
   }
 
   for (const [skillId, delta] of Object.entries(rewards.skillDeltas)) {
-    const fieldName = `skill${skillId.charAt(0).toUpperCase()}${skillId.slice(1)}`;
+    const fieldName = skillIdToArenaField(skillId);
     arenaUpdate[fieldName] = increment(delta as number);
   }
 
   if (payload.isPersonalBest) {
-    arenaUpdate.personalBests = { [payload.gameSlug]: payload.score };
+    arenaUpdate[`personalBests.${payload.gameSlug}`] = payload.score;
   }
 
-  batch.set(arenaRef, arenaUpdate, { merge: true });
+  // Use batch.update (not set+merge) so dot-notation field paths like
+  // 'gameLevels.speed-math' are resolved as nested updates, not literal keys.
+  // The document is guaranteed to exist (checked above on line 121–124).
+  batch.update(arenaRef, arenaUpdate);
 
   // 2. users/{uid} — update coins, diamonds, globalXp, globalLevel, and 10% arena XP sync
-  const quizyXpSync = Math.floor(rewards.newArenaXp * 0.1);
+  const quizyXpEarned = Math.floor(rewards.xpEarned * QUIZY_XP_SHARE);
   const userRef = getDocRef('users', payload.userId);
   const userUpdate: Record<string, unknown> = {
     globalXp: rewards.newGlobalXp,
     globalLevel: rewards.newGlobalLevel,
     coins: increment(payload.coinsEarned),
     diamonds: increment(payload.diamondsEarned),
-    xp: quizyXpSync,
+    xp: increment(quizyXpEarned),
     updatedAt: serverTimestamp(),
     lastActiveAt: serverTimestamp(),
   };
@@ -227,6 +246,16 @@ async function fallbackSave(input: SaveInput): Promise<void> {
   const highestLevel = (payload.metadata?.highestLevel as number) ?? payload.level;
 
   // 1. Update arena_profiles
+  const projectedGameLevels: Record<string, number> = {
+    ...(input.currentGameLevels ?? {}),
+  };
+  if (levelCompleted && highestLevel >= 1) {
+    projectedGameLevels[payload.gameSlug] = Math.max(
+      projectedGameLevels[payload.gameSlug] ?? 0,
+      highestLevel,
+    );
+  }
+
   const arenaUpdate: Record<string, unknown> = {
     uid: payload.userId,
     arenaXp: increment(rewards.xpEarned),
@@ -236,35 +265,34 @@ async function fallbackSave(input: SaveInput): Promise<void> {
     totalPlayTimeSec: increment(payload.durationSec),
     lastPlayedAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
-    unlockedWorldSlugs: getUnlockedWorldSlugs(rewards.newGlobalLevel),
+    unlockedWorldSlugs: getUnlockedWorldSlugs(projectedGameLevels),
   };
 
   if (levelCompleted) {
     arenaUpdate.gamesWon = increment(1);
     if (highestLevel >= 1) {
-      arenaUpdate.gameLevels = { [payload.gameSlug]: highestLevel };
+      arenaUpdate[`gameLevels.${payload.gameSlug}`] = highestLevel;
     }
   }
 
   for (const [skillId, delta] of Object.entries(rewards.skillDeltas)) {
-    const fieldName = `skill${skillId.charAt(0).toUpperCase()}${skillId.slice(1)}`;
+    const fieldName = skillIdToArenaField(skillId);
     arenaUpdate[fieldName] = increment(delta as number);
   }
 
   if (payload.isPersonalBest) {
-    arenaUpdate.personalBests = { [payload.gameSlug]: payload.score };
+    arenaUpdate[`personalBests.${payload.gameSlug}`] = payload.score;
   }
 
-  await setDocument('arena_profiles', payload.userId, arenaUpdate, { merge: true });
+  await updateDocument('arena_profiles', payload.userId, arenaUpdate);
 
-  // 2. Update users
-  const quizyXpSync = Math.floor(rewards.newArenaXp * 0.1);
+  const quizyXpEarned = Math.floor(rewards.xpEarned * QUIZY_XP_SHARE);
   await setDocument('users', payload.userId, {
     globalXp: rewards.newGlobalXp,
     globalLevel: rewards.newGlobalLevel,
     coins: increment(payload.coinsEarned),
     diamonds: increment(payload.diamondsEarned),
-    xp: quizyXpSync,
+    xp: increment(quizyXpEarned),
     updatedAt: serverTimestamp(),
     lastActiveAt: serverTimestamp(),
   }, { merge: true });
@@ -293,22 +321,24 @@ async function writeBatchFromPayload(payload: SavePayload): Promise<void> {
   if (levelCompleted) {
     arenaUpdate.gamesWon = increment(1);
     if (highestLevel >= 1) {
-      arenaUpdate.gameLevels = { [payload.gameSlug]: highestLevel };
+      // Use dot-notation so Firestore updates only this game's level
+      // instead of replacing the entire gameLevels map
+      arenaUpdate[`gameLevels.${payload.gameSlug}`] = highestLevel;
     }
   }
 
   for (const [skillId, delta] of Object.entries(payload.skillDeltas)) {
-    const fieldName = `skill${skillId.charAt(0).toUpperCase()}${skillId.slice(1)}`;
+    const fieldName = skillIdToArenaField(skillId);
     arenaUpdate[fieldName] = increment(delta as number);
   }
 
-  await setDocument('arena_profiles', payload.userId, arenaUpdate, { merge: true });
+  await updateDocument('arena_profiles', payload.userId, arenaUpdate);
 
   await setDocument('users', payload.userId, {
-    globalXp: increment(payload.xpEarned),
+    globalXp: increment(Math.floor(payload.xpEarned * QUIZY_XP_SHARE)),
     coins: increment(payload.coinsEarned),
     diamonds: increment(payload.diamondsEarned),
-    xp: increment(Math.floor(payload.xpEarned * 0.1)),
+    xp: increment(Math.floor(payload.xpEarned * QUIZY_XP_SHARE)),
     updatedAt: serverTimestamp(),
   }, { merge: true });
 }

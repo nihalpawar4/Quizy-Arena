@@ -14,7 +14,7 @@ const VALID_TRANSITIONS: Record<GameLifecycleState, GameLifecycleState[]> = {
   playing:      ['paused', 'completed', 'failed'],
   paused:       ['playing', 'failed'],      // Can quit from pause (→ failed)
   completed:    ['scoring'],
-  failed:       ['scoring'],
+  failed:       ['scoring', 'playing'],       // Can resume via extra life (→ playing)
   scoring:      ['results'],
   results:      ['saving'],
   saving:       ['rewards'],

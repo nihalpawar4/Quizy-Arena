@@ -49,6 +49,8 @@ export default function PatternTrailGame({ engine }: GameComponentProps) {
   const [flashColor, setFlashColor] = useState<number | null>(null);
   const [flashType, setFlashType] = useState<'correct' | 'wrong' | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(null);
+  // Use ref to always have latest sequence for replay callback
+  const sequenceRef = useRef<number[]>([]);
 
   const generateSequence = useCallback((length: number) => {
     const seq: number[] = [];
@@ -58,16 +60,11 @@ export default function PatternTrailGame({ engine }: GameComponentProps) {
     return seq;
   }, [colorCount]);
 
-  const startRound = useCallback(() => {
-    const seq = generateSequence(seqLen);
-    setSequence(seq);
-    setPlayerInput([]);
-    setPhase('showing');
-    setFlashColor(null);
-    setFlashType(null);
-
-    // Show sequence one by one
+  const showSequence = useCallback((seq: number[]) => {
     let i = 0;
+    setActiveIdx(null);
+    setPhase('showing');
+
     const showNext = () => {
       if (i < seq.length) {
         setActiveIdx(seq[i]);
@@ -82,9 +79,18 @@ export default function PatternTrailGame({ engine }: GameComponentProps) {
       }
     };
 
-    // Brief pause before starting
     timeoutRef.current = setTimeout(showNext, 500);
-  }, [generateSequence, seqLen, displayMs]);
+  }, [displayMs]);
+
+  const startRound = useCallback(() => {
+    const seq = generateSequence(seqLen);
+    sequenceRef.current = seq;
+    setSequence(seq);
+    setPlayerInput([]);
+    setFlashColor(null);
+    setFlashType(null);
+    showSequence(seq);
+  }, [generateSequence, seqLen, showSequence]);
 
   // Start first round
   useEffect(() => {
@@ -92,6 +98,7 @@ export default function PatternTrailGame({ engine }: GameComponentProps) {
       startRound();
     }
     return () => { if (timeoutRef.current) clearTimeout(timeoutRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine.state]);
 
   const handleColorTap = useCallback((colorIdx: number) => {
@@ -119,58 +126,55 @@ export default function PatternTrailGame({ engine }: GameComponentProps) {
         setTimeout(() => {
           const nextRound = round + 1;
           setRound(nextRound);
-          setSeqLen((prev) => prev + 1); // Increase sequence length
-          startRound();
+          // Increase sequence length and start next round
+          const nextSeqLen = seqLen + 1;
+          setSeqLen(nextSeqLen);
+          const seq = generateSequence(nextSeqLen);
+          sequenceRef.current = seq;
+          setSequence(seq);
+          setPlayerInput([]);
+          setFlashColor(null);
+          setFlashType(null);
+          showSequence(seq);
         }, 800);
       }
     } else {
       // Wrong tap
       setFlashColor(colorIdx);
       setFlashType('wrong');
+      // recordWrong handles life deduction + fail when lives reach 0
       engine.recordWrong();
 
       setTimeout(() => {
         setFlashColor(null);
         setFlashType(null);
 
-        // Check if out of lives
         if (engine.lives <= 1) {
-          engine.complete();
+          // Engine's recordWrong has already scheduled a fail — just let it happen
+          // Call engine.fail() only if lives are already 0 to ensure it fires
+          engine.fail();
         } else {
           // Retry same sequence
           setPlayerInput([]);
-          setPhase('showing');
-          let i = 0;
-          const showNext = () => {
-            if (i < sequence.length) {
-              setActiveIdx(sequence[i]);
-              setTimeout(() => {
-                setActiveIdx(null);
-                i++;
-                timeoutRef.current = setTimeout(showNext, displayMs * 0.3);
-              }, displayMs);
-            } else {
-              setActiveIdx(null);
-              setPhase('input');
-            }
-          };
-          timeoutRef.current = setTimeout(showNext, 500);
+          showSequence(sequenceRef.current);
         }
       }, 500);
     }
-  }, [phase, engine, playerInput, sequence, seqLen, round, startRound, displayMs]);
+  }, [phase, engine, playerInput, sequence, seqLen, round, generateSequence, showSequence]);
 
   if (engine.state !== 'playing') return null;
 
+  const timerPercent = Math.max(0, (seqLen / (baseSeqLen + 10)) * 100);
+
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6 gap-6">
+    <div className="flex-1 flex flex-col items-center justify-center p-4 gap-5 min-h-0">
       {/* Status */}
       <div className="text-center">
         <p className="text-xs text-text-tertiary mb-1">Round {round + 1}</p>
         <p className="text-sm font-semibold text-text-secondary">
           {phase === 'showing' && 'Watch the pattern...'}
           {phase === 'input' && `Tap ${sequence.length - playerInput.length} more`}
-          {phase === 'feedback' && 'Perfect!'}
+          {phase === 'feedback' && 'Perfect! ✨'}
         </p>
       </div>
 
@@ -206,9 +210,9 @@ export default function PatternTrailGame({ engine }: GameComponentProps) {
               type="button"
               onClick={() => handleColorTap(idx)}
               disabled={phase !== 'input'}
-              whileTap={phase === 'input' ? { scale: 0.9 } : undefined}
+              whileTap={phase === 'input' ? { scale: 0.88 } : undefined}
               className={cn(
-                'aspect-square rounded-2xl transition-all cursor-pointer',
+                'aspect-square rounded-2xl transition-all cursor-pointer touch-manipulation',
                 'border-2 shadow-sm',
                 phase === 'input' && 'hover:shadow-md active:shadow-inner',
               )}

@@ -29,7 +29,7 @@ export async function createArenaProfile(uid: string, globalXp = 0): Promise<voi
     personalBests: {},
     gameLevels: {},
     currentWorldSlug: 'training-camp',
-    unlockedWorldSlugs: getUnlockedWorldSlugs(playerLevel),
+    unlockedWorldSlugs: getUnlockedWorldSlugs(),
     isOnboarded: false,
     selectedSkillGoals: [],
     dailyChallengeDate: null,

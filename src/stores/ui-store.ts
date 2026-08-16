@@ -28,7 +28,7 @@ interface UIStore {
 let toastCounter = 0;
 
 export const useUIStore = create<UIStore>((set) => ({
-  sidebarOpen: true,
+  sidebarOpen: false,
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
 
   activeModal: null,

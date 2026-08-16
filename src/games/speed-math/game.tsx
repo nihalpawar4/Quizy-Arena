@@ -157,7 +157,7 @@ export default function SpeedMathGame({ engine }: GameComponentProps) {
   }, [engine.state]);
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6 gap-8">
+    <div className="flex-1 flex flex-col items-center justify-center p-5 gap-7 min-h-0">
       {/* Problem Display */}
       <AnimatePresence mode="wait">
         <motion.div

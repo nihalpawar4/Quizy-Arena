@@ -31,7 +31,7 @@ export const frostReflexDefinition: GameDefinition = {
   baseCoinReward: 30,
   diamondChance: 0.12,
 
-  unlockLevel: 10,
+  unlockLevel: 6,
   unlockWorldSlug: 'ice-kingdom',
 
   isOfflineCapable: true,

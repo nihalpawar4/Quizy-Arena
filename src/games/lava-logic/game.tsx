@@ -142,7 +142,7 @@ export default function LavaLogicGame({ engine }: GameComponentProps) {
   if (!puzzle) return null;
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-4 py-6">
+    <div className="flex-1 flex flex-col items-center justify-center px-4 py-5 min-h-0">
       {/* Progress */}
       <div className="flex items-center gap-1.5 mb-6">
         {Array.from({ length: totalRounds }).map((_, i) => (
@@ -200,7 +200,7 @@ export default function LavaLogicGame({ engine }: GameComponentProps) {
                   animate={{ opacity: 1, scale: 1 }}
                   transition={{ delay: i * 0.05 }}
                   className={cn(
-                    'py-4 rounded-xl text-lg font-bold font-mono transition-all cursor-pointer border-2',
+                    'py-4 rounded-xl text-lg font-bold font-mono transition-all cursor-pointer touch-manipulation border-2',
                     variant === 'correct' && 'bg-green-500/15 border-green-500/50 text-green-600',
                     variant === 'wrong' && 'bg-red-500/15 border-red-500/50 text-red-500',
                     variant === 'default' && 'bg-surface border-border text-text-primary hover:bg-card-hover hover:border-red-400/30',

@@ -14,6 +14,7 @@ import {
   onSnapshot,
   serverTimestamp,
   increment,
+  runTransaction,
   type DocumentReference,
   type QueryConstraint,
   type Unsubscribe,
@@ -43,9 +44,7 @@ export async function getDocument<T>(
   collectionName: string,
   docId: string,
 ): Promise<T | null> {
-  const cacheKey = firebaseCache.constructor.prototype
-    ? `${collectionName}:${docId}`
-    : `${collectionName}:${docId}`;
+  const cacheKey = `${collectionName}:${docId}`;
 
   // Check cache first
   const cached = firebaseCache.get<T | null>(cacheKey);
@@ -55,8 +54,11 @@ export async function getDocument<T>(
     const snap = await getDoc(doc(getFirebaseDb(), collectionName, docId));
     const data = snap.exists() ? (snap.data() as T) : null;
 
-    // Populate cache
-    firebaseCache.set(cacheKey, data);
+    // Only cache existing documents — caching null can cause stale reads
+    // when a document is created shortly after a miss (e.g. during onboarding)
+    if (data !== null) {
+      firebaseCache.set(cacheKey, data);
+    }
 
     return data;
   } catch (error) {
@@ -124,6 +126,38 @@ export async function deleteDocument(
 }
 
 /**
+ * Atomically claim a new document (fails if it already exists).
+ * Uses a Firestore transaction to prevent race conditions.
+ * Returns true if the document was created, false if it already existed.
+ */
+export async function claimNewDocument(
+  collectionName: string,
+  docId: string,
+  data: Record<string, unknown>,
+): Promise<boolean> {
+  try {
+    const ref = doc(getFirebaseDb(), collectionName, docId);
+    const claimed = await runTransaction(getFirebaseDb(), async (transaction) => {
+      const existing = await transaction.get(ref);
+      if (existing.exists()) {
+        return false; // Already taken
+      }
+      transaction.set(ref, data);
+      return true;
+    });
+
+    if (claimed) {
+      firebaseCache.invalidate(`${collectionName}:${docId}`);
+      firebaseCache.invalidatePrefix(`${collectionName}:q:`);
+    }
+
+    return claimed;
+  } catch (error) {
+    throw classifyError(error);
+  }
+}
+
+/**
  * Query documents from a collection with constraints.
  * Cache-first with a hash-based key derived from constraint types.
  */
@@ -131,8 +165,8 @@ export async function queryDocuments<T>(
   collectionName: string,
   ...constraints: QueryConstraint[]
 ): Promise<T[]> {
-  // Build a simple hash from stringified constraints
-  const hash = constraints.map((c) => String(c)).join('|');
+  // Build a deterministic hash from constraint internals
+  const hash = constraints.map((c) => JSON.stringify({ t: c.type, ...c })).join('|');
   const cacheKey = `${collectionName}:q:${hash}`;
 
   // Check cache first
@@ -185,7 +219,7 @@ export async function querySubCollection<T>(
   subCollection: string,
   ...constraints: QueryConstraint[]
 ): Promise<T[]> {
-  const hash = constraints.map((c) => String(c)).join('|');
+  const hash = constraints.map((c) => JSON.stringify({ t: c.type, ...c })).join('|');
   const cacheKey = `${parentCollection}:${parentId}:${subCollection}:q:${hash}`;
 
   const cached = firebaseCache.get<T[]>(cacheKey);

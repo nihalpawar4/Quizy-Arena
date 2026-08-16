@@ -19,6 +19,7 @@ import {
   calculateBrainScore,
   levelFromXp,
 } from '@/lib/xp';
+import { QUIZY_XP_SHARE } from '@/lib/game-economy';
 
 interface RewardInput {
   definition: GameDefinition;
@@ -79,12 +80,12 @@ export function calculateRewards(input: RewardInput): RewardResult {
     xpEarned = Math.floor(xpEarned * 1.2);
   }
 
-  // Cap at 500 XP per game
-  xpEarned = Math.min(xpEarned, 500);
-
   // Level multiplier: higher game levels earn more XP
   const levelMultiplier = 1 + Math.min((level - 1) * 0.025, 0.5); // Up to +50%
   xpEarned = Math.floor(xpEarned * levelMultiplier);
+
+  // Cap at 500 XP per game (applied after all multipliers to be the true ceiling)
+  xpEarned = Math.min(xpEarned, 500);
 
   // ── Coins ──
   const coinsEarned = calculateGameCoins({
@@ -118,7 +119,8 @@ export function calculateRewards(input: RewardInput): RewardResult {
 
   // ── Level Calculations ──
   const newArenaXp = currentArenaXp + xpEarned;
-  const newGlobalXp = currentGlobalXp + xpEarned;
+  const quizyXpEarned = Math.floor(xpEarned * QUIZY_XP_SHARE);
+  const newGlobalXp = currentGlobalXp + quizyXpEarned;
   const oldArenaLevel = levelFromXp(currentArenaXp);
   const newArenaLevel = levelFromXp(newArenaXp);
   const newGlobalLevel = levelFromXp(newGlobalXp);
@@ -127,19 +129,19 @@ export function calculateRewards(input: RewardInput): RewardResult {
   // ── Brain Score ──
   const updatedSkills = { ...currentSkills };
   for (const [skillId, delta] of Object.entries(skillDeltas)) {
-    const current = updatedSkills[skillId] ?? 50;
+    const current = updatedSkills[skillId] ?? 0;
     updatedSkills[skillId] = Math.min(100, current + delta);
   }
 
   const newBrainScore = calculateBrainScore({
-    memory: updatedSkills.memory ?? 50,
-    logic: updatedSkills.logic ?? 50,
-    focus: updatedSkills.focus ?? 50,
-    reaction: updatedSkills.reaction ?? 50,
-    creativity: updatedSkills.creativity ?? 50,
-    problemSolving: updatedSkills.problemSolving ?? 50,
-    patternRecognition: updatedSkills.patternRecognition ?? 50,
-    decisionMaking: updatedSkills.decisionMaking ?? 50,
+    memory: updatedSkills.memory ?? 0,
+    logic: updatedSkills.logic ?? 0,
+    focus: updatedSkills.focus ?? 0,
+    reaction: updatedSkills.reaction ?? 0,
+    creativity: updatedSkills.creativity ?? 0,
+    problemSolving: updatedSkills.problemSolving ?? 0,
+    patternRecognition: updatedSkills.patternRecognition ?? 0,
+    decisionMaking: updatedSkills.decisionMaking ?? 0,
   });
 
   // ── Streak ──

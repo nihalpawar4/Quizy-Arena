@@ -110,7 +110,7 @@ export default function DesertRiddleGame({ engine }: GameComponentProps) {
   }
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-4 py-6">
+    <div className="flex-1 flex flex-col items-center justify-center px-4 py-5 min-h-0">
       {/* Progress dots */}
       <div className="flex items-center gap-1.5 mb-6">
         {riddles.map((_, i) => (
@@ -161,7 +161,7 @@ export default function DesertRiddleGame({ engine }: GameComponentProps) {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05 }}
                   className={cn(
-                    'w-full px-5 py-3.5 rounded-xl text-sm font-medium text-left transition-all cursor-pointer',
+                    'w-full px-5 py-3.5 rounded-xl text-sm font-medium text-left transition-all cursor-pointer touch-manipulation',
                     'border-2 flex items-center gap-3',
                     variant === 'correct' && 'bg-green-500/15 border-green-500/50 text-green-600',
                     variant === 'wrong' && 'bg-red-500/15 border-red-500/50 text-red-500',

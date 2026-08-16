@@ -59,7 +59,7 @@ export async function syncEcosystemOnLogin(
   }
 
   await updateDocument('arena_profiles', uid, {
-    unlockedWorldSlugs: getUnlockedWorldSlugs(mergedLevel),
+    unlockedWorldSlugs: getUnlockedWorldSlugs(),
     updatedAt: serverTimestamp(),
   });
 }

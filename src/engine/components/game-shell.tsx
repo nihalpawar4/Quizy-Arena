@@ -47,6 +47,69 @@ export function GameShell({
 }: GameShellProps) {
   const [currentLevel, setCurrentLevel] = useState(initialLevel);
   const [gameKey, setGameKey] = useState(0);
+
+  /**
+   * Level-up: increment currentLevel and bump gameKey.
+   * The gameKey change forces GameShellInner to fully remount,
+   * giving useGameEngine a fresh initialization with the correct level config.
+   * This eliminates the stale-closure bug where engine.reset() used old diffConfig.
+   */
+  const handleNextLevel = useCallback(() => {
+    setCurrentLevel((l) => Math.min(l + 1, maxLevel));
+    setGameKey((k) => k + 1);
+  }, [maxLevel]);
+
+  const handlePlayAgain = useCallback(() => {
+    setGameKey((k) => k + 1);
+  }, []);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-bg flex flex-col"
+      style={{ '--game-accent': definition.accentColor } as React.CSSProperties}
+    >
+      <GameShellInner
+        key={`${currentLevel}-${gameKey}`}
+        definition={definition}
+        GameComponent={GameComponent}
+        difficulty={difficulty}
+        level={currentLevel}
+        maxLevel={maxLevel}
+        onExit={onExit}
+        onNextLevel={handleNextLevel}
+        onPlayAgain={handlePlayAgain}
+      />
+    </div>
+  );
+}
+
+/**
+ * Inner component that owns useGameEngine.
+ * Keyed by level + gameKey so it remounts cleanly on level changes or retries.
+ * This guarantees diffConfig, timer, and scoring are always initialized
+ * with the correct level parameters — no stale closures.
+ */
+interface GameShellInnerProps {
+  definition: GameDefinition;
+  GameComponent: React.LazyExoticComponent<React.ComponentType<GameComponentProps>>;
+  difficulty?: GameDifficulty;
+  level: number;
+  maxLevel: number;
+  onExit: () => void;
+  onNextLevel: () => void;
+  onPlayAgain: () => void;
+}
+
+function GameShellInner({
+  definition,
+  GameComponent,
+  difficulty,
+  level,
+  maxLevel,
+  onExit,
+  onNextLevel,
+  onPlayAgain,
+}: GameShellInnerProps) {
   const [coinCheckPassed, setCoinCheckPassed] = useState(false);
   const [deductingCoins, setDeductingCoins] = useState(false);
 
@@ -55,15 +118,14 @@ export function GameShell({
   const userCoins = userProfile?.coins ?? 0;
   const userDiamonds = userProfile?.diamonds ?? 0;
 
-  const coinCost = getGameCoinCost(currentLevel);
-  const canAfford = canAffordGame(userCoins, currentLevel);
+  const coinCost = getGameCoinCost(level);
+  const canAfford = canAffordGame(userCoins, level);
 
-  const engine = useGameEngine({ definition, difficulty, level: currentLevel });
+  const engine = useGameEngine({ definition, difficulty, level });
 
-  // Auto-signal ready once mounted (or after reset)
+  // Auto-signal ready once mounted
   useEffect(() => {
     if (engine.state === 'loading') {
-      // For Level 1 (free), skip coin check
       if (coinCost === 0) {
         setCoinCheckPassed(true);
       }
@@ -71,7 +133,7 @@ export function GameShell({
       return () => clearTimeout(timeout);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine.state, gameKey]);
+  }, [engine.state]);
 
   const handlePayAndStart = useCallback(async () => {
     if (!firebaseUser) return;
@@ -91,43 +153,36 @@ export function GameShell({
     }
   }, [firebaseUser, coinCost, engine]);
 
-  const handlePlayAgain = useCallback(() => {
-    setCoinCheckPassed(false);
-    engine.reset();
-    setGameKey((k) => k + 1);
-  }, [engine]);
-
-  const handleNextLevel = useCallback(() => {
-    setCoinCheckPassed(false);
-    setCurrentLevel((l) => Math.min(l + 1, maxLevel));
-    engine.reset();
-    setGameKey((k) => k + 1);
-  }, [engine]);
-
   const handleBuyLife = useCallback(async () => {
     if (!firebaseUser || userDiamonds < DIAMOND_PER_LIFE) return;
     const success = await buyExtraLife(firebaseUser.uid);
     if (success) {
-      // Add a life back to the engine
       engine.resume();
     }
   }, [firebaseUser, userDiamonds, engine]);
 
+  const wrappedPlayAgain = useCallback(() => {
+    setCoinCheckPassed(false);
+    onPlayAgain();
+  }, [onPlayAgain]);
+
+  const wrappedNextLevel = useCallback(() => {
+    setCoinCheckPassed(false);
+    onNextLevel();
+  }, [onNextLevel]);
+
   return (
-    <div
-      className="fixed inset-0 z-50 bg-bg flex flex-col"
-      style={{ '--game-accent': definition.accentColor } as React.CSSProperties}
-    >
+    <>
       {/* ── Loading ── */}
       {engine.state === 'loading' && (
-        <GameLoadingScreen definition={definition} level={currentLevel} />
+        <GameLoadingScreen definition={definition} level={level} />
       )}
 
       {/* ── Instructions ── */}
       {engine.state === 'instructions' && (
         <GameInstructionsScreen
           definition={definition}
-          level={currentLevel}
+          level={level}
           difficulty={difficulty ?? engine.difficulty}
           coinCost={coinCost}
           canAfford={canAfford}
@@ -150,7 +205,7 @@ export function GameShell({
         <>
           <GameHUD engine={engine} />
 
-          <div className="flex-1 overflow-hidden" key={gameKey}>
+          <div className="flex-1 overflow-hidden min-h-0 flex flex-col">
             <Suspense
               fallback={
                 <div className="flex-1 flex items-center justify-center">
@@ -213,16 +268,16 @@ export function GameShell({
         <ResultScreen
           definition={definition}
           engine={engine}
-          level={currentLevel}
+          level={level}
           maxLevel={maxLevel}
           scoreResult={engine.scoreResult}
           rewardResult={engine.rewardResult}
-          onPlayAgain={handlePlayAgain}
-          onNextLevel={handleNextLevel}
+          onPlayAgain={wrappedPlayAgain}
+          onNextLevel={wrappedNextLevel}
           onContinue={onExit}
         />
       )}
-    </div>
+    </>
   );
 }
 

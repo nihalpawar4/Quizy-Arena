@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth-store';
+import { ResetNotice } from '@/components/reset-notice';
 import { useRecentGames } from '@/hooks/use-recent-games';
 import { useLeaderboard } from '@/hooks/use-leaderboard';
 import { formatNumber, getGreeting } from '@/lib/utils';
@@ -22,7 +23,7 @@ import { getGameLevelProgress, getNextPlayLevel, MAX_GAME_LEVEL } from '@/lib/ga
 import {
   ChevronRight,
   Clock,
-  CheckCircle2,
+
   Flame,
   Sparkles,
 } from 'lucide-react';
@@ -46,7 +47,7 @@ import { cn } from '@/lib/utils';
 
 const GAME_META: Record<
   string,
-  { name: string; icon: typeof BrainIcon; iconKey: 'brain' | 'lightning' | 'target'; color: string; skill: string }
+  { name: string; icon: typeof BrainIcon; iconKey: 'brain' | 'lightning' | 'target' | 'puzzle' | 'eye' | 'crystal'; color: string; skill: string }
 > = {
   'memory-match': { name: 'Memory Match', icon: BrainIcon, iconKey: 'brain', color: '#3B82F6', skill: 'Memory' },
   'speed-math': { name: 'Speed Math', icon: LightningIcon, iconKey: 'lightning', color: '#FACC15', skill: 'Reaction' },
@@ -54,6 +55,11 @@ const GAME_META: Record<
   'memory-grove': { name: 'Memory Grove', icon: BrainIcon, iconKey: 'brain', color: '#22C55E', skill: 'Memory' },
   'logic-sprint': { name: 'Logic Sprint', icon: LightningIcon, iconKey: 'lightning', color: '#38BDF8', skill: 'Logic' },
   'pattern-trail': { name: 'Pattern Trail', icon: TargetIcon, iconKey: 'target', color: '#16A34A', skill: 'Pattern' },
+  'ice-puzzle': { name: 'Ice Puzzle', icon: BrainIcon, iconKey: 'puzzle', color: '#60A5FA', skill: 'Logic' },
+  'frost-reflex': { name: 'Frost Reflex', icon: LightningIcon, iconKey: 'lightning', color: '#93C5FD', skill: 'Reaction' },
+  'falling-ice': { name: 'Falling Ice', icon: LightningIcon, iconKey: 'crystal', color: '#38BDF8', skill: 'Logic' },
+  'glacier-match': { name: 'Glacier Match', icon: BrainIcon, iconKey: 'brain', color: '#7DD3FC', skill: 'Memory' },
+  'snowstorm-sort': { name: 'Snowstorm Sort', icon: TargetIcon, iconKey: 'eye', color: '#A5F3FC', skill: 'Focus' },
 };
 
 function getLevelTitle(level: number): string {
@@ -88,6 +94,7 @@ export default function HomePage() {
   const dailySlug = getDailyChallengeSlug();
   const dailyMeta = GAME_META[dailySlug] ?? GAME_META['memory-match'];
   const hoursLeft = getHoursUntilMidnight();
+  // Check the explicit flag written by save-manager when the daily challenge is completed
   const challengeCompleted = isDailyChallengeCompleted(
     arenaProfile?.dailyChallengeDate,
     arenaProfile?.dailyChallengeSlug,
@@ -106,6 +113,9 @@ export default function HomePage() {
 
   return (
     <div className="space-y-5 max-w-2xl mx-auto">
+      {/* Reset notice popup — shows once after major update */}
+      <ResetNotice />
+
       {/* ═══ Hero Banner ═══ */}
       <section className="relative overflow-hidden rounded-3xl bg-surface shadow-md">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/8 via-transparent to-accent/10 pointer-events-none" />
@@ -141,24 +151,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ═══ Daily Challenge ═══ */}
-      {challengeCompleted ? (
-        <div className="relative overflow-hidden rounded-2xl p-5 lg:p-6 bg-gradient-to-br from-success/90 to-emerald-600 text-white shadow-md">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-2 mb-1.5">
-                <CheckCircle2 className="h-4 w-4" />
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-white/80">Daily Challenge Complete</span>
-              </div>
-              <h2 className="text-lg font-bold">{dailyMeta.name}</h2>
-              <p className="text-sm text-white/70 mt-1">Great job! Come back tomorrow for a new challenge.</p>
-            </div>
-            <div className="hidden sm:flex h-14 w-14 rounded-2xl bg-white/15 items-center justify-center shrink-0">
-              <GameIcon iconKey={dailyMeta.iconKey} color="#fff" size={28} />
-            </div>
-          </div>
-        </div>
-      ) : (
+      {/* ═══ Daily Challenge (hidden when completed) ═══ */}
+      {!challengeCompleted && (
         <Link href={`/games/${dailySlug}`} className="block group">
           <div className="relative overflow-hidden rounded-2xl p-5 lg:p-6 bg-gradient-to-br from-primary via-primary to-accent text-white shadow-md hover:shadow-lg transition-shadow">
             <div className="flex items-center justify-between gap-4">

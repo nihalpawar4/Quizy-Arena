@@ -6,8 +6,8 @@
  */
 
 import { getDocRef, increment } from '@/lib/firebase/firestore';
-import { getFirebaseDb } from '@/lib/firebase/config';
 import { doc, updateDoc } from 'firebase/firestore';
+import { useAuthStore } from '@/stores/auth-store';
 
 /**
  * Get the coin cost to play a game at a given level.
@@ -45,6 +45,7 @@ export async function deductCoins(uid: string, amount: number): Promise<boolean>
     await updateDoc(userRef, {
       coins: increment(-amount),
     });
+    useAuthStore.getState().adjustCoins(-amount);
     return true;
   } catch (error) {
     console.error('[Economy] Failed to deduct coins:', error);
@@ -62,6 +63,7 @@ export async function buyExtraLife(uid: string): Promise<boolean> {
     await updateDoc(userRef, {
       diamonds: increment(-DIAMOND_PER_LIFE),
     });
+    useAuthStore.getState().adjustDiamonds(-DIAMOND_PER_LIFE);
     return true;
   } catch (error) {
     console.error('[Economy] Failed to buy extra life:', error);

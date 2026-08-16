@@ -28,11 +28,13 @@ export default function CyberCodeGame({ engine }: GameComponentProps) {
   const [activeShowIdx, setActiveShowIdx] = useState(-1);
   const [feedbackCorrect, setFeedbackCorrect] = useState(false);
   const showTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Ref to hold latest pattern for use inside callbacks without stale closure
+  const patternRef = useRef<number[]>([]);
 
   // Current pattern length grows every 3 rounds
   const currentPatternLen = patternLength + Math.floor(currentRound / 3);
 
-  // Generate and show pattern
+  // Generate and show pattern — fixed dep: engine.state (string) not engine.state === 'playing' (boolean)
   useEffect(() => {
     if (engine.state !== 'playing') return;
 
@@ -41,6 +43,7 @@ export default function CyberCodeGame({ engine }: GameComponentProps) {
     for (let i = 0; i < currentPatternLen; i++) {
       newPattern.push(Math.floor(Math.random() * CODE_COLORS.length));
     }
+    patternRef.current = newPattern;
     setPattern(newPattern);
     setPlayerInput([]);
     setPhase('showing');
@@ -69,7 +72,7 @@ export default function CyberCodeGame({ engine }: GameComponentProps) {
       if (showTimerRef.current) clearTimeout(showTimerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentRound, engine.state === 'playing']);
+  }, [currentRound, engine.state]);
 
   const handleColorTap = useCallback(
     (colorIdx: number) => {
@@ -80,8 +83,8 @@ export default function CyberCodeGame({ engine }: GameComponentProps) {
 
       const inputIdx = newInput.length - 1;
 
-      // Check if this input matches the pattern
-      if (newInput[inputIdx] !== pattern[inputIdx]) {
+      // Check if this input matches the pattern (use ref to avoid stale closure)
+      if (newInput[inputIdx] !== patternRef.current[inputIdx]) {
         // Wrong!
         setPhase('feedback');
         setFeedbackCorrect(false);
@@ -98,7 +101,7 @@ export default function CyberCodeGame({ engine }: GameComponentProps) {
       }
 
       // Check if complete
-      if (newInput.length === pattern.length) {
+      if (newInput.length === patternRef.current.length) {
         // Correct!
         setPhase('feedback');
         setFeedbackCorrect(true);
@@ -114,11 +117,11 @@ export default function CyberCodeGame({ engine }: GameComponentProps) {
         }, 800);
       }
     },
-    [phase, engine, playerInput, pattern, currentRound, totalRounds, maxScore],
+    [phase, engine, playerInput, currentRound, totalRounds, maxScore],
   );
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center px-4 py-6">
+    <div className="flex-1 flex flex-col items-center justify-center px-4 py-5 min-h-0">
       {/* Round progress */}
       <div className="flex items-center gap-1.5 mb-4">
         {Array.from({ length: totalRounds }).map((_, i) => (
@@ -134,7 +137,7 @@ export default function CyberCodeGame({ engine }: GameComponentProps) {
       </div>
 
       {/* Phase indicator */}
-      <div className="mb-6 text-center">
+      <div className="mb-5 text-center">
         <AnimatePresence mode="wait">
           {phase === 'showing' && (
             <motion.p
@@ -173,7 +176,7 @@ export default function CyberCodeGame({ engine }: GameComponentProps) {
       </div>
 
       {/* Pattern display (shown during 'showing' phase) */}
-      <div className="flex items-center justify-center gap-2 mb-8 min-h-[48px]">
+      <div className="flex items-center justify-center gap-2 mb-7 min-h-[48px]">
         {pattern.map((colorIdx, i) => (
           <motion.div
             key={i}
@@ -203,9 +206,9 @@ export default function CyberCodeGame({ engine }: GameComponentProps) {
             key={i}
             onClick={() => handleColorTap(i)}
             disabled={phase !== 'input'}
-            whileTap={{ scale: 0.9 }}
+            whileTap={{ scale: 0.88 }}
             className={cn(
-              'aspect-square rounded-2xl border-2 transition-all cursor-pointer',
+              'aspect-square rounded-2xl border-2 transition-all cursor-pointer touch-manipulation',
               'flex items-center justify-center',
               `${color.bg} ${color.border}`,
               phase !== 'input' && 'opacity-50',

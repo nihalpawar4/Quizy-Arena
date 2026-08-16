@@ -48,7 +48,7 @@ function GamesPageContent() {
     arenaProfile?.arenaLevel ?? 1,
     levelFromXp(arenaProfile?.arenaXp ?? 0),
   );
-  const unlockedWorlds = getUnlockedWorldSlugs(globalLevel);
+  const unlockedWorlds = getUnlockedWorldSlugs(arenaProfile?.gameLevels);
 
   useEffect(() => {
     if (worldParam) setSelectedWorld(worldParam);
@@ -83,12 +83,12 @@ function GamesPageContent() {
       </div>
 
       {viewMode === 'map' ? (
-        <WorldMapView playerLevel={globalLevel} unlockedWorlds={unlockedWorlds} onSelectWorld={setSelectedWorld} />
+        <WorldMapView playerLevel={globalLevel} unlockedWorlds={unlockedWorlds} onSelectWorld={setSelectedWorld} gameLevels={arenaProfile?.gameLevels} />
       ) : (
         <DiscoverView playerLevel={globalLevel} unlockedWorlds={unlockedWorlds} />
       )}
 
-      <WorldGamesPanel worldSlug={selectedWorld} playerLevel={globalLevel} onClose={() => setSelectedWorld(null)} />
+      <WorldGamesPanel worldSlug={selectedWorld} playerLevel={globalLevel} gameLevels={arenaProfile?.gameLevels} onClose={() => setSelectedWorld(null)} />
     </div>
   );
 }
@@ -97,10 +97,12 @@ function WorldMapView({
   playerLevel,
   unlockedWorlds,
   onSelectWorld,
+  gameLevels,
 }: {
   playerLevel: number;
   unlockedWorlds: string[];
   onSelectWorld: (slug: string) => void;
+  gameLevels?: Record<string, number>;
 }) {
   const activeWorlds = WORLDS.filter((w) => (ACTIVE_WORLD_SLUGS as readonly string[]).includes(w.slug));
   const lockedWorlds = WORLDS.filter((w) => !(ACTIVE_WORLD_SLUGS as readonly string[]).includes(w.slug));
@@ -109,8 +111,16 @@ function WorldMapView({
     <div className="space-y-3">
       {[...activeWorlds].reverse().map((world) => {
         const isUnlocked = unlockedWorlds.includes(world.slug);
-        const progress = getWorldProgress(playerLevel, world.slug);
+        const progress = getWorldProgress(world.slug, gameLevels);
         const games = getGamesForWorld(world.slug);
+        const doneCount = games.filter((g) => {
+          const highest = gameLevels?.[g.slug] ?? 0;
+          return highest >= 10; // simplified check
+        }).length;
+        // Stars: 1 per ~33% of games done
+        const starCount = games.length > 0
+          ? Math.min(3, Math.floor((doneCount / games.length) * 3 + 0.01))
+          : 0;
 
         return (
           <button
@@ -127,14 +137,28 @@ function WorldMapView({
               <div className="flex-1 min-w-0">
                 <CardTitle>{world.name}</CardTitle>
                 <p className="text-xs text-text-tertiary mt-0.5">
-                  {isUnlocked ? `Level ${world.unlockLevel} · ${games.length} games` : `Unlocks at Level ${world.unlockLevel}`}
+                  {isUnlocked
+                    ? `${doneCount}/${games.length} games completed`
+                    : 'Complete previous world to unlock'}
                 </p>
-                <div className="mt-2"><ProgressBar value={isUnlocked ? 100 : progress} size="sm" /></div>
+                <div className="mt-2"><ProgressBar value={progress} size="sm" /></div>
               </div>
               <div className="flex flex-col items-end gap-1.5 shrink-0">
                 {isUnlocked ? (
                   <>
-                    <div className="flex gap-0.5">{[1, 2, 3].map((s) => <Star key={s} className="h-3 w-3 text-text-disabled" />)}</div>
+                    <div className="flex gap-0.5">
+                      {[1, 2, 3].map((s) => (
+                        <Star
+                          key={s}
+                          className={cn(
+                            'h-3 w-3',
+                            s <= starCount
+                              ? 'text-warning fill-warning'
+                              : 'text-text-disabled',
+                          )}
+                        />
+                      ))}
+                    </div>
                     <ChevronRight className="h-4 w-4 text-text-tertiary" />
                   </>
                 ) : (

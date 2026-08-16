@@ -6,7 +6,13 @@ import { Modal } from '@/components/ui/modal';
 import { Badge } from '@/components/ui/badge';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { WORLDS } from '@/lib/constants';
-import { getGamesForWorld, getWorldProgress, isWorldUnlocked } from '@/lib/worlds';
+import {
+  getGamesForWorld,
+  getWorldProgress,
+  isWorldUnlocked,
+  isGameUnlockedInWorld,
+  isGameDone,
+} from '@/lib/worlds';
 import { formatSkillLabel, getGameLevelProgress, MAX_GAME_LEVEL } from '@/lib/game-config';
 import { GameIcon, WorldIllustration } from '@/components/games/game-icon';
 import { CoinIcon } from '@/components/illustrations/icons';
@@ -17,10 +23,11 @@ import { cn } from '@/lib/utils';
 interface WorldGamesPanelProps {
   worldSlug: string | null;
   playerLevel: number;
+  gameLevels?: Record<string, number>;
   onClose: () => void;
 }
 
-export function WorldGamesPanel({ worldSlug, playerLevel, onClose }: WorldGamesPanelProps) {
+export function WorldGamesPanel({ worldSlug, playerLevel, gameLevels, onClose }: WorldGamesPanelProps) {
   const arenaProfile = useAuthStore((s) => s.arenaProfile);
 
   if (!worldSlug) return null;
@@ -28,10 +35,12 @@ export function WorldGamesPanel({ worldSlug, playerLevel, onClose }: WorldGamesP
   const world = WORLDS.find((w) => w.slug === worldSlug);
   if (!world) return null;
 
-  const unlocked = isWorldUnlocked(worldSlug, playerLevel);
+  const unlocked = isWorldUnlocked(worldSlug, gameLevels);
   const games = getGamesForWorld(worldSlug);
-  const progress = getWorldProgress(playerLevel, worldSlug);
+  const progress = getWorldProgress(worldSlug, gameLevels);
 
+  // Count completed games for the description
+  const completedCount = games.filter((g) => isGameDone(g.slug, gameLevels)).length;
 
   return (
     <Modal
@@ -40,8 +49,8 @@ export function WorldGamesPanel({ worldSlug, playerLevel, onClose }: WorldGamesP
       title={world.name}
       description={
         unlocked
-          ? `Level ${world.unlockLevel} · ${games.length} games available`
-          : `Unlocks at Level ${world.unlockLevel}`
+          ? `${completedCount}/${games.length} games completed · ${games.length} games available`
+          : `Complete all games in the previous world to unlock`
       }
       size="lg"
       className="max-w-lg"
@@ -56,15 +65,17 @@ export function WorldGamesPanel({ worldSlug, playerLevel, onClose }: WorldGamesP
             ) : (
               <Badge variant="default">
                 <Lock className="h-3 w-3 mr-1" />
-                Lv. {world.unlockLevel}
+                Locked
               </Badge>
             )}
           </div>
           <div className="mt-2">
-            <ProgressBar value={unlocked ? 100 : progress} size="sm" />
+            <ProgressBar value={progress} size="sm" />
           </div>
           <p className="text-[11px] text-text-tertiary mt-1">
-            {unlocked ? 'All games ready to play' : `${progress}% toward unlock`}
+            {unlocked
+              ? `${completedCount}/${games.length} games completed`
+              : `${progress}% toward unlock`}
           </p>
         </div>
       </div>
@@ -72,12 +83,42 @@ export function WorldGamesPanel({ worldSlug, playerLevel, onClose }: WorldGamesP
       {unlocked ? (
         <div className="space-y-2">
           {games.length > 0 ? (
-            games.map((game) => {
+            games.map((game, index) => {
               const highest = arenaProfile?.gameLevels?.[game.slug] ?? 0;
               const levelProgress = getGameLevelProgress(highest);
               const durationMin = Math.max(1, Math.ceil(game.defaultDurationSec / 60));
               const nextLevel = Math.min(highest + 1, MAX_GAME_LEVEL);
               const nextCoinCost = getGameCoinCost(nextLevel);
+              const gameUnlocked = isGameUnlockedInWorld(game.slug, gameLevels);
+              const done = isGameDone(game.slug, gameLevels);
+
+              // Get the name of the game that must be completed to unlock this one
+              const prevGameName = index > 0 ? games[index - 1].title : null;
+
+              if (!gameUnlocked) {
+                return (
+                  <div
+                    key={game.slug}
+                    className="flex items-center gap-3 p-3 rounded-xl bg-surface/60 opacity-60"
+                  >
+                    <div
+                      className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0"
+                      style={{ backgroundColor: `${game.accentColor}10` }}
+                    >
+                      <Lock className="h-5 w-5 text-text-disabled" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-text-disabled">{game.title}</p>
+                      <p className="text-[10px] text-text-tertiary mt-0.5">
+                        {prevGameName
+                          ? `Complete "${prevGameName}" first`
+                          : 'Locked'}
+                      </p>
+                    </div>
+                    <Lock className="h-4 w-4 text-text-disabled" />
+                  </div>
+                );
+              }
 
               return (
                 <Link
@@ -93,7 +134,12 @@ export function WorldGamesPanel({ worldSlug, playerLevel, onClose }: WorldGamesP
                     <GameIcon iconKey={game.iconKey} color={game.accentColor} size={22} />
                   </div>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-text-primary">{game.title}</p>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-semibold text-text-primary">{game.title}</p>
+                      {done && (
+                        <Badge variant="success">✓</Badge>
+                      )}
+                    </div>
                     <div className="flex items-center gap-2 mt-0.5">
                       <Badge variant="primary">{formatSkillLabel(game.primarySkill)}</Badge>
                       <span className="text-[10px] text-text-tertiary flex items-center gap-0.5">
@@ -113,7 +159,7 @@ export function WorldGamesPanel({ worldSlug, playerLevel, onClose }: WorldGamesP
                       <ProgressBar value={levelProgress} size="sm" />
                       <p className="text-[10px] text-text-tertiary mt-0.5">
                         Level {nextLevel}/{MAX_GAME_LEVEL}
-                        {highest >= MAX_GAME_LEVEL ? ' · Complete' : ''}
+                        {done ? ' · Complete' : ''}
                       </p>
                     </div>
                   </div>
@@ -131,10 +177,7 @@ export function WorldGamesPanel({ worldSlug, playerLevel, onClose }: WorldGamesP
         <div className="text-center py-8">
           <WorldIllustration slug={worldSlug} size={64} className="mx-auto mb-3 opacity-50" />
           <p className="text-sm text-text-secondary">
-            Reach Level {world.unlockLevel} to unlock {world.name}
-          </p>
-          <p className="text-xs text-text-tertiary mt-1">
-            You are currently Level {playerLevel}
+            Complete all games in the previous world to unlock {world.name}
           </p>
         </div>
       )}
@@ -145,16 +188,18 @@ export function WorldGamesPanel({ worldSlug, playerLevel, onClose }: WorldGamesP
 interface WorldCardProps {
   worldSlug: string;
   playerLevel: number;
+  gameLevels?: Record<string, number>;
   onSelect: (slug: string) => void;
   compact?: boolean;
 }
 
-export function WorldCard({ worldSlug, playerLevel, onSelect, compact }: WorldCardProps) {
+export function WorldCard({ worldSlug, playerLevel, gameLevels, onSelect, compact }: WorldCardProps) {
   const world = WORLDS.find((w) => w.slug === worldSlug);
   if (!world) return null;
 
-  const unlocked = isWorldUnlocked(worldSlug, playerLevel);
-
+  const unlocked = isWorldUnlocked(worldSlug, gameLevels);
+  const games = getGamesForWorld(worldSlug);
+  const completedCount = games.filter((g) => isGameDone(g.slug, gameLevels)).length;
 
   return (
     <button
@@ -180,11 +225,13 @@ export function WorldCard({ worldSlug, playerLevel, onSelect, compact }: WorldCa
             <p className="text-xs font-semibold text-text-primary truncate">{world.name}</p>
             <div className="flex items-center justify-center gap-1 mt-1">
               {unlocked ? (
-                <span className="text-[10px] text-success font-medium">Level {world.unlockLevel}</span>
+                <span className="text-[10px] text-success font-medium">
+                  {completedCount}/{games.length} done
+                </span>
               ) : (
                 <>
                   <Lock className="h-3 w-3 text-text-disabled" />
-                  <span className="text-[10px] text-text-tertiary">Lv. {world.unlockLevel}</span>
+                  <span className="text-[10px] text-text-tertiary">Locked</span>
                 </>
               )}
             </div>
@@ -195,7 +242,9 @@ export function WorldCard({ worldSlug, playerLevel, onSelect, compact }: WorldCa
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-text-primary">{world.name}</p>
               <p className="text-xs text-text-tertiary mt-0.5">
-                {unlocked ? `Level ${world.unlockLevel}` : `Unlocks at Level ${world.unlockLevel}`}
+                {unlocked
+                  ? `${completedCount}/${games.length} games completed`
+                  : 'Complete previous world to unlock'}
               </p>
             </div>
             {unlocked ? (

@@ -8,6 +8,8 @@ import { useAuthStore } from '@/stores/auth-store';
 import type { UserDocument, ArenaProfileDocument } from '@/lib/firebase/types';
 import type { Unsubscribe } from 'firebase/firestore';
 import { syncEcosystemOnLogin } from '@/lib/firebase/ecosystem-sync';
+import { processOfflineQueue } from '@/engine/save-manager';
+import { getGameDefinition } from '@/engine/registry';
 
 /**
  * AuthProvider listens to Firebase Auth state changes and attaches
@@ -117,6 +119,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       unsubArena?.();
     };
   }, [setFirebaseUser, setUserProfile, setArenaProfile, setAuthLoading, setProfileLoading]);
+
+  // ── Offline queue: flush pending game saves when connectivity is restored ──
+  useEffect(() => {
+    const handleOnline = () => {
+      const uid = useAuthStore.getState().firebaseUser?.uid;
+      if (!uid) return;
+
+      processOfflineQueue(getGameDefinition)
+        .then((synced) => {
+          if (synced > 0) {
+            console.info(`[OfflineQueue] Synced ${synced} queued game session(s)`);
+          }
+        })
+        .catch((err) => console.warn('[OfflineQueue] Failed to process queue:', err));
+    };
+
+    window.addEventListener('online', handleOnline);
+
+    // Also try to flush on mount in case the app was reloaded while online
+    // and there are stale items from a previous offline session
+    handleOnline();
+
+    return () => window.removeEventListener('online', handleOnline);
+  }, []);
 
   return <>{children}</>;
 }

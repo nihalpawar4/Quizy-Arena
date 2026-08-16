@@ -166,7 +166,7 @@ export default function MemoryGroveGame({ engine }: GameComponentProps) {
   if (engine.state !== 'playing') return null;
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6 gap-4">
+    <div className="flex-1 flex flex-col items-center justify-center p-4 gap-4 min-h-0">
       {/* Round indicator */}
       <div className="flex items-center gap-2 mb-2">
         <span className="text-xs font-medium text-text-tertiary">
@@ -239,7 +239,7 @@ export default function MemoryGroveGame({ engine }: GameComponentProps) {
                   type="button"
                   onClick={() => handleWordTap(word)}
                   className={cn(
-                    'px-4 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer',
+                    'px-3 py-2 rounded-xl text-sm font-medium transition-all cursor-pointer touch-manipulation',
                     'border',
                     selectedWords.has(word)
                       ? 'bg-primary text-white border-primary shadow-sm'

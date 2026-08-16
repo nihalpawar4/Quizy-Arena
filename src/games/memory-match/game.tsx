@@ -79,30 +79,32 @@ export default function MemoryMatchGame({ engine }: GameComponentProps) {
   const [cards, setCards] = useState<Card[]>(() => createDeck(pairCount));
   const [flippedIds, setFlippedIds] = useState<number[]>([]);
   const [isChecking, setIsChecking] = useState(false);
-  const [matchedCount, setMatchedCount] = useState(0);
   const [isPreviewing, setIsPreviewing] = useState(true);
+  // Use ref for matchedCount to avoid stale closure in the flippedIds effect
+  const matchedCountRef = useRef(0);
   const previewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Preview: show all cards face-up briefly at start
   useEffect(() => {
-    if (engine.state === 'playing' && isPreviewing) {
-      // Show all cards face up
-      queueMicrotask(() => {
-        setCards((prev) => prev.map((c) => ({ ...c, isFlipped: true })));
-      });
+    if (engine.state !== 'playing') return;
+    if (!isPreviewing) return;
 
-      previewTimeoutRef.current = setTimeout(() => {
-        // Hide all cards
-        setCards((prev) => prev.map((c) => ({ ...c, isFlipped: false })));
-        setIsPreviewing(false);
-      }, previewTimeSec * 1000);
+    // Show all cards face up
+    queueMicrotask(() => {
+      setCards((prev) => prev.map((c) => ({ ...c, isFlipped: true })));
+    });
 
-      return () => {
-        if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
-      };
-    }
+    previewTimeoutRef.current = setTimeout(() => {
+      // Hide all cards
+      setCards((prev) => prev.map((c) => ({ ...c, isFlipped: false })));
+      setIsPreviewing(false);
+    }, previewTimeSec * 1000);
+
+    return () => {
+      if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine.state === 'playing']);
+  }, [engine.state]);
 
   // Check for match when 2 cards are flipped
   useEffect(() => {
@@ -125,16 +127,17 @@ export default function MemoryMatchGame({ engine }: GameComponentProps) {
         );
         setFlippedIds([]);
         setIsChecking(false);
-        setMatchedCount((prev) => prev + 1);
 
-        // Score based on time bonus
+        // Increment ref first, then check completion — avoids stale closure
+        matchedCountRef.current += 1;
+        const newMatchedCount = matchedCountRef.current;
+
         const pointsPerMatch = Math.floor(
           (engine.difficultyConfig.maxScore as number) / pairCount,
         );
         engine.recordCorrect(pointsPerMatch);
 
-        // Check for game completion
-        if (matchedCount + 1 >= pairCount) {
+        if (newMatchedCount >= pairCount) {
           setTimeout(() => engine.complete(), 500);
         }
       }, 200);
@@ -166,7 +169,6 @@ export default function MemoryMatchGame({ engine }: GameComponentProps) {
       const card = cards.find((c) => c.id === cardId);
       if (!card || card.isFlipped || card.isMatched) return;
 
-      // Flip the card
       setCards((prev) =>
         prev.map((c) =>
           c.id === cardId ? { ...c, isFlipped: true } : c,
@@ -178,7 +180,7 @@ export default function MemoryMatchGame({ engine }: GameComponentProps) {
   );
 
   return (
-    <div className="flex-1 flex items-center justify-center p-4">
+    <div className="flex-1 flex items-center justify-center p-3 min-h-0">
       <GameGrid cols={cols} gap={totalCards > 24 ? 6 : 10}>
         {cards.map((card) => (
           <motion.button
@@ -186,7 +188,7 @@ export default function MemoryMatchGame({ engine }: GameComponentProps) {
             onClick={() => handleCardClick(card.id)}
             disabled={card.isFlipped || card.isMatched || isChecking || isPreviewing}
             className={cn(
-              'relative aspect-square w-full rounded-xl border-2 transition-colors select-none cursor-pointer',
+              'relative aspect-square w-full rounded-xl border-2 transition-colors select-none cursor-pointer touch-manipulation',
               'flex items-center justify-center',
               card.isMatched
                 ? 'border-success/30 bg-success-muted/30 opacity-60'

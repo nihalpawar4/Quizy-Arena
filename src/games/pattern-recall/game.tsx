@@ -20,6 +20,8 @@ export default function PatternRecallGame({ engine }: GameComponentProps) {
   const [round, setRound] = useState(1);
   const [feedbackTile, setFeedbackTile] = useState<{ id: number; correct: boolean } | null>(null);
   const showTimeoutRef = useRef<NodeJS.Timeout[]>([]);
+  // Keep ref to current sequence for use inside callbacks (avoids stale closures)
+  const sequenceRef = useRef<number[]>([]);
 
   // Generate new sequence — never repeats exact sequence from last round
   const lastSequenceRef = useRef<string>('');
@@ -52,6 +54,7 @@ export default function PatternRecallGame({ engine }: GameComponentProps) {
     (roundNum: number) => {
       const seqLength = startLength + roundNum - 1;
       const newSeq = generateSequence(seqLength);
+      sequenceRef.current = newSeq;
       setSequence(newSeq);
       setPlayerInput([]);
       setPhase('showing');
@@ -87,7 +90,7 @@ export default function PatternRecallGame({ engine }: GameComponentProps) {
     [engine, generateSequence, startLength, showTimeMsPerTile],
   );
 
-  // Start first round on mount
+  // Start first round on mount — fixed dep: [engine.state] not [engine.state === 'playing']
   useEffect(() => {
     if (engine.state === 'playing') {
       queueMicrotask(() => startRound(1));
@@ -96,7 +99,7 @@ export default function PatternRecallGame({ engine }: GameComponentProps) {
       showTimeoutRef.current.forEach(clearTimeout);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine.state === 'playing']);
+  }, [engine.state]);
 
   // Handle tile tap during input phase
   const handleTileTap = useCallback(
@@ -104,7 +107,7 @@ export default function PatternRecallGame({ engine }: GameComponentProps) {
       if (phase !== 'input' || engine.state !== 'playing') return;
 
       const nextIndex = playerInput.length;
-      const expected = sequence[nextIndex];
+      const expected = sequenceRef.current[nextIndex];
 
       if (tileId === expected) {
         // Correct tap
@@ -113,7 +116,7 @@ export default function PatternRecallGame({ engine }: GameComponentProps) {
         setFeedbackTile({ id: tileId, correct: true });
         setTimeout(() => setFeedbackTile(null), 200);
 
-        if (newInput.length === sequence.length) {
+        if (newInput.length === sequenceRef.current.length) {
           // Round complete!
           const pointsPerRound = Math.floor(50 + round * 10);
           engine.recordCorrect(pointsPerRound);
@@ -125,7 +128,7 @@ export default function PatternRecallGame({ engine }: GameComponentProps) {
           setTimeout(() => startRound(nextRound), 800);
         }
       } else {
-        // Wrong tap
+        // Wrong tap — recordWrong handles fail automatically when lives reach 0
         setFeedbackTile({ id: tileId, correct: false });
         engine.recordWrong();
 
@@ -138,11 +141,11 @@ export default function PatternRecallGame({ engine }: GameComponentProps) {
         }, 600);
       }
     },
-    [phase, playerInput, sequence, engine, round, startRound],
+    [phase, playerInput, engine, round, startRound],
   );
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6 gap-6">
+    <div className="flex-1 flex flex-col items-center justify-center p-4 gap-5 min-h-0">
       {/* Round indicator */}
       <div className="text-center">
         <p className="text-sm font-medium text-text-primary">
@@ -152,14 +155,14 @@ export default function PatternRecallGame({ engine }: GameComponentProps) {
           {phase === 'showing'
             ? 'Watch the pattern...'
             : phase === 'input'
-              ? `Tap ${sequence.length - playerInput.length} more`
+              ? `Tap ${sequenceRef.current.length - playerInput.length} more`
               : '✓ Correct!'}
         </p>
       </div>
 
       {/* Grid */}
       <div
-        className="grid gap-3 w-full max-w-[280px] mx-auto"
+        className="grid gap-2.5 w-full max-w-[300px] mx-auto"
         style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
       >
         {Array.from({ length: gridSize }).map((_, tileId) => {
@@ -173,7 +176,7 @@ export default function PatternRecallGame({ engine }: GameComponentProps) {
               onClick={() => handleTileTap(tileId)}
               disabled={phase !== 'input' || isPlayerTapped}
               className={cn(
-                'aspect-square rounded-xl border-2 transition-colors select-none cursor-pointer',
+                'aspect-square rounded-xl border-2 transition-colors select-none cursor-pointer touch-manipulation',
                 'flex items-center justify-center',
                 isActive
                   ? 'border-primary bg-primary shadow-[0_0_20px_rgba(99,102,241,0.3)]'
@@ -197,7 +200,7 @@ export default function PatternRecallGame({ engine }: GameComponentProps) {
       {/* Progress dots showing sequence progress */}
       {phase === 'input' && (
         <div className="flex items-center gap-1.5">
-          {sequence.map((_, i) => (
+          {sequenceRef.current.map((_, i) => (
             <div
               key={i}
               className={cn(

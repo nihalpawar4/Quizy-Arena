@@ -126,11 +126,13 @@ export default function LogicSprintGame({ engine }: GameComponentProps) {
     pairIntervalRef.current = setInterval(() => {
       setPairTimeLeft((prev) => {
         if (prev <= 0.1) {
-          // Time's up — count as wrong
           if (pairIntervalRef.current) clearInterval(pairIntervalRef.current);
-          engine.recordWrong();
-          setFeedback('wrong');
-          setTimeout(nextPair, 600);
+          // Defer the side effects to avoid setState-during-render
+          queueMicrotask(() => {
+            engine.recordWrong();
+            setFeedback('wrong');
+            setTimeout(nextPair, 600);
+          });
           return 0;
         }
         return prev - 0.1;
@@ -170,7 +172,7 @@ export default function LogicSprintGame({ engine }: GameComponentProps) {
   const timerPercent = Math.max(0, (pairTimeLeft / timePerPair) * 100);
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-6 gap-6">
+    <div className="flex-1 flex flex-col items-center justify-center p-6 gap-6 min-h-0">
       <p className="text-xs text-text-tertiary">Tap the LARGER value</p>
 
       {/* Per-pair timer */}
@@ -200,7 +202,7 @@ export default function LogicSprintGame({ engine }: GameComponentProps) {
             disabled={!!feedback}
             className={cn(
               'flex-1 aspect-square max-h-40 rounded-2xl flex items-center justify-center',
-              'text-2xl sm:text-3xl font-bold font-mono transition-all cursor-pointer',
+              'text-2xl sm:text-3xl font-bold font-mono transition-all cursor-pointer touch-manipulation',
               'border-2',
               !feedback && 'bg-surface border-border hover:border-primary hover:shadow-md active:scale-95',
               feedback && tappedSide === 'left' && feedback === 'correct' && 'bg-success/15 border-success text-success',

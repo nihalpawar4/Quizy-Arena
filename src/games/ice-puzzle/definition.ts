@@ -31,7 +31,7 @@ export const icePuzzleDefinition: GameDefinition = {
   baseCoinReward: 35,
   diamondChance: 0.15,
 
-  unlockLevel: 10,
+  unlockLevel: 6,
   unlockWorldSlug: 'ice-kingdom',
 
   isOfflineCapable: true,

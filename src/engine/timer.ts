@@ -28,6 +28,9 @@ export interface TimerOptions {
 
 const DEFAULT_LOW_TIME_SEC = 10;
 
+/** Minimum ms between onTick callbacks to avoid excessive React re-renders */
+const TICK_THROTTLE_MS = 100;
+
 export class TimerManager {
   private mode: TimerMode;
   private durationSec: number;
@@ -37,10 +40,12 @@ export class TimerManager {
   private startTime: number = 0;
   private pausedAt: number = 0;
   private totalPausedMs: number = 0;
+  private roundPausedMs: number = 0;
   private animFrameId: number = 0;
   private isRunning: boolean = false;
   private hasTriggeredLowTime: boolean = false;
   private roundStartTime: number = 0;
+  private lastTickMs: number = 0;
 
   private onTick?: (state: TimerState) => void;
   private onLowTime?: () => void;
@@ -69,8 +74,10 @@ export class TimerManager {
     this.startTime = performance.now();
     this.roundStartTime = this.startTime;
     this.totalPausedMs = 0;
+    this.roundPausedMs = 0;
     this.isRunning = true;
     this.hasTriggeredLowTime = false;
+    this.lastTickMs = 0;
     this.tick();
   }
 
@@ -89,7 +96,9 @@ export class TimerManager {
    */
   resume(): void {
     if (this.isRunning) return;
-    this.totalPausedMs += performance.now() - this.pausedAt;
+    const pauseDuration = performance.now() - this.pausedAt;
+    this.totalPausedMs += pauseDuration;
+    this.roundPausedMs += pauseDuration;
     this.isRunning = true;
     this.tick();
   }
@@ -99,6 +108,7 @@ export class TimerManager {
    */
   resetRound(): void {
     this.roundStartTime = performance.now();
+    this.roundPausedMs = 0;
     this.hasTriggeredLowTime = false;
   }
 
@@ -146,11 +156,11 @@ export class TimerManager {
   }
 
   /**
-   * Get elapsed seconds in current round.
+   * Get elapsed seconds in current round (excluding only this round's paused time).
    */
   private getRoundElapsedSec(): number {
     const now = this.isRunning ? performance.now() : this.pausedAt;
-    return (now - this.roundStartTime - this.totalPausedMs) / 1000;
+    return (now - this.roundStartTime - this.roundPausedMs) / 1000;
   }
 
   /**
@@ -163,26 +173,34 @@ export class TimerManager {
 
   /**
    * Internal tick loop using requestAnimationFrame.
+   * onTick is throttled to fire at most every TICK_THROTTLE_MS to avoid
+   * excessive React state updates (~60 setState/sec → ~10 setState/sec).
+   * Expiry/lowTime checks still run every frame for accuracy.
    */
   private tick = (): void => {
     if (!this.isRunning) return;
 
     const state = this.getState();
+    const now = performance.now();
 
-    // Notify tick
-    this.onTick?.(state);
-
-    // Low time warning
+    // Low time warning (checked every frame)
     if (state.isLowTime && !this.hasTriggeredLowTime) {
       this.hasTriggeredLowTime = true;
       this.onLowTime?.();
     }
 
-    // Timer expired
+    // Timer expired (checked every frame)
     if (state.isExpired) {
       this.isRunning = false;
+      this.onTick?.(state); // Final tick with expired state
       this.onExpire?.();
       return;
+    }
+
+    // Throttled tick callback to avoid excessive React re-renders
+    if (now - this.lastTickMs >= TICK_THROTTLE_MS) {
+      this.lastTickMs = now;
+      this.onTick?.(state);
     }
 
     this.animFrameId = requestAnimationFrame(this.tick);

@@ -25,6 +25,7 @@ import { saveGameSession } from './save-manager';
 import { getGamesPlayedToday } from './anti-cheat';
 import { getLevelConfig, difficultyFromLevel } from './level-generator';
 import { useAuthStore } from '@/stores/auth-store';
+import { buildSkillsRecord } from '@/lib/firebase/skill-fields';
 import { generateId } from '@/lib/utils';
 
 interface UseGameEngineOptions {
@@ -64,7 +65,7 @@ export function useGameEngine(options: UseGameEngineOptions): GameEngine & {
   const difficulty = options.difficulty ?? difficultyFromLevel(level);
   const diffConfig = getLevelConfig(definition.slug, level);
 
-  const { firebaseUser, arenaProfile, userProfile } = useAuthStore();
+  const { firebaseUser, arenaProfile, userProfile, applyGameRewards } = useAuthStore();
 
   const [engineState, setEngineState] = useState<GameEngineState>({
     state: 'loading',
@@ -87,13 +88,28 @@ export function useGameEngine(options: UseGameEngineOptions): GameEngine & {
   const timerRef = useRef<TimerManager | null>(null);
   const stateRef = useRef(engineState.state);
   const sessionOutcomeRef = useRef<'completed' | 'failed' | null>(null);
+  const failTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   stateRef.current = engineState.state;
 
-  // ── Timer setup ──
-  useEffect(() => {
-    if (definition.timerMode === 'infinite') return;
+  // ── Lifecycle transition helper ──
+  const transitionTo = useCallback(
+    (next: GameLifecycleState) => {
+      setEngineState((prev) => {
+        const newState = transition(prev.state, next);
+        if (newState !== prev.state) {
+          onStateChange?.(newState);
+        }
+        return { ...prev, state: newState };
+      });
+    },
+    [onStateChange],
+  );
 
-    const timer = new TimerManager({
+  // ── Timer factory (reused by setup and reset) ──
+  const createTimer = useCallback(() => {
+    if (definition.timerMode === 'infinite') return null;
+
+    return new TimerManager({
       mode: definition.timerMode,
       durationSec: diffConfig.durationSec,
       perRoundDurationSec: definition.timerMode === 'perRound'
@@ -109,32 +125,32 @@ export function useGameEngine(options: UseGameEngineOptions): GameEngine & {
       },
       onExpire: () => {
         if (stateRef.current === 'playing') {
+          // Mark the outcome before transitioning so levelCompleted is true
+          // when the save runs. Without this, timer-expiry games (Speed Math,
+          // Pattern Recall, etc.) would never save their level progression.
+          sessionOutcomeRef.current = 'completed';
           transitionTo('completed');
         }
       },
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [definition, diffConfig, transitionTo]);
 
+  // ── Timer setup ──
+  useEffect(() => {
+    const timer = createTimer();
     timerRef.current = timer;
 
     return () => {
-      timer.destroy();
+      timer?.destroy();
+      // Clean up any pending fail timeout on unmount
+      if (failTimeoutRef.current) {
+        clearTimeout(failTimeoutRef.current);
+        failTimeoutRef.current = null;
+      }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // ── Lifecycle transition helper ──
-  const transitionTo = useCallback(
-    (next: GameLifecycleState) => {
-      setEngineState((prev) => {
-        const newState = transition(prev.state, next);
-        if (newState !== prev.state) {
-          onStateChange?.(newState);
-        }
-        return { ...prev, state: newState };
-      });
-    },
-    [onStateChange],
-  );
 
   // ── Auto-transitions after state changes ──
   useEffect(() => {
@@ -152,6 +168,12 @@ export function useGameEngine(options: UseGameEngineOptions): GameEngine & {
     }
 
     if (state === 'scoring') {
+      // Read live profile data from store (not stale closure) to ensure
+      // rewards are calculated against the latest skills, XP, and personal bests
+      const liveState = useAuthStore.getState();
+      const liveArenaProfile = liveState.arenaProfile;
+      const liveUserProfile = liveState.userProfile;
+
       // Run scoring + rewards calculation
       const scoreResult = calculateScore({
         rawScore: engineState.score,
@@ -166,18 +188,9 @@ export function useGameEngine(options: UseGameEngineOptions): GameEngine & {
         timerMode: definition.timerMode,
       });
 
-      const currentSkills: Record<string, number> = {
-        memory: arenaProfile?.skillMemory ?? 50,
-        logic: arenaProfile?.skillLogic ?? 50,
-        focus: arenaProfile?.skillFocus ?? 50,
-        reaction: arenaProfile?.skillReaction ?? 50,
-        creativity: arenaProfile?.skillCreativity ?? 50,
-        problemSolving: arenaProfile?.skillProblemSolving ?? 50,
-        patternRecognition: arenaProfile?.skillPatternRecognition ?? 50,
-        decisionMaking: arenaProfile?.skillDecisionMaking ?? 50,
-      };
+      const currentSkills = buildSkillsRecord(liveArenaProfile);
 
-      const previousBest = arenaProfile?.personalBests?.[definition.slug] ?? null;
+      const previousBest = liveArenaProfile?.personalBests?.[definition.slug] ?? null;
 
       const rewardResult = calculateRewards({
         definition,
@@ -188,23 +201,22 @@ export function useGameEngine(options: UseGameEngineOptions): GameEngine & {
         correctAnswers: engineState.correctAnswers,
         wrongAnswers: engineState.wrongAnswers,
         maxCombo: engineState.maxCombo,
-        currentArenaXp: arenaProfile?.arenaXp ?? 0,
-        currentGlobalXp: userProfile?.globalXp ?? 0,
-        currentArenaStreak: arenaProfile?.arenaStreak ?? 0,
+        currentArenaXp: liveArenaProfile?.arenaXp ?? 0,
+        currentGlobalXp: liveUserProfile?.globalXp ?? 0,
+        currentArenaStreak: liveArenaProfile?.arenaStreak ?? 0,
         currentSkills,
         previousBestScore: previousBest,
         gamesPlayedToday: getGamesPlayedToday(),
       });
 
-      queueMicrotask(() => {
-        setEngineState((prev) => ({
-          ...prev,
-          scoreResult,
-          rewardResult,
-        }));
-      });
+      // Set results synchronously (safe inside useEffect — no need for queueMicrotask)
+      setEngineState((prev) => ({
+        ...prev,
+        scoreResult,
+        rewardResult,
+      }));
 
-      // Auto-transition to results
+      // Auto-transition to results (delay ensures React commits the state above first)
       const timeout = setTimeout(() => transitionTo('results'), 100);
       return () => clearTimeout(timeout);
     }
@@ -216,11 +228,14 @@ export function useGameEngine(options: UseGameEngineOptions): GameEngine & {
     }
 
     if (state === 'saving') {
+      // Read live profile for the freshest gameLevels
+      const liveArena = useAuthStore.getState().arenaProfile;
+
       // Perform save
       const { scoreResult, rewardResult } = engineState;
       if (scoreResult && rewardResult && firebaseUser) {
         const levelCompleted = sessionOutcomeRef.current === 'completed';
-        const prevHighest = arenaProfile?.gameLevels?.[definition.slug] ?? 0;
+        const prevHighest = liveArena?.gameLevels?.[definition.slug] ?? 0;
         const highestLevel = levelCompleted ? Math.max(prevHighest, level) : prevHighest;
 
         const payload: SavePayload = {
@@ -244,7 +259,9 @@ export function useGameEngine(options: UseGameEngineOptions): GameEngine & {
           metadata: { levelCompleted, highestLevel },
         };
 
-        saveGameSession({ payload, rewards: rewardResult, definition })
+        applyGameRewards(payload, rewardResult);
+
+        saveGameSession({ payload, rewards: rewardResult, definition, currentGameLevels: liveArena?.gameLevels })
           .then(() => transitionTo('rewards'))
           .catch((err) => {
             console.error('[GameEngine] Save failed:', err);
@@ -274,6 +291,7 @@ export function useGameEngine(options: UseGameEngineOptions): GameEngine & {
   const engine: GameEngine = {
     // State
     state: engineState.state,
+    sessionOutcome: sessionOutcomeRef.current,
     score: engineState.score,
     timeRemaining: engineState.timeRemaining,
     timeElapsed: engineState.timeElapsed,
@@ -322,12 +340,16 @@ export function useGameEngine(options: UseGameEngineOptions): GameEngine & {
     recordWrong: () => {
       setEngineState((prev) => {
         const newLives = definition.supportsLives
-          ? prev.lives - 1
+          ? Math.max(0, prev.lives - 1)
           : prev.lives;
 
-        if (newLives <= 0 && definition.supportsLives) {
-          // Schedule fail transition
-          setTimeout(() => transitionTo('failed'), 100);
+        // Schedule fail transition once (guard: only if no timeout is already pending)
+        if (newLives <= 0 && definition.supportsLives && stateRef.current === 'playing' && !failTimeoutRef.current) {
+          sessionOutcomeRef.current = 'failed';
+          failTimeoutRef.current = setTimeout(() => {
+            failTimeoutRef.current = null;
+            transitionTo('failed');
+          }, 100);
         }
 
         return {
@@ -363,32 +385,46 @@ export function useGameEngine(options: UseGameEngineOptions): GameEngine & {
 
     loseLife: () => {
       setEngineState((prev) => {
-        const newLives = prev.lives - 1;
-        if (newLives <= 0) {
-          setTimeout(() => transitionTo('failed'), 100);
+        const newLives = Math.max(0, prev.lives - 1);
+        if (newLives <= 0 && stateRef.current === 'playing' && !failTimeoutRef.current) {
+          sessionOutcomeRef.current = 'failed';
+          failTimeoutRef.current = setTimeout(() => {
+            failTimeoutRef.current = null;
+            transitionTo('failed');
+          }, 100);
         }
         return { ...prev, lives: newLives };
       });
     },
 
     complete: () => {
+      // Guard: only transition if still playing (prevents double-complete)
+      if (stateRef.current !== 'playing') return;
       sessionOutcomeRef.current = 'completed';
       transitionTo('completed');
     },
     fail: () => {
+      // Guard: only transition if still playing or paused (prevents double-fail)
+      if (stateRef.current !== 'playing' && stateRef.current !== 'paused') return;
       sessionOutcomeRef.current = 'failed';
       transitionTo('failed');
     },
 
     pause: () => {
-      if (engineState.state === 'playing') {
+      if (stateRef.current === 'playing') {
         transitionTo('paused');
         timerRef.current?.pause();
       }
     },
 
     resume: () => {
-      if (engineState.state === 'paused') {
+      if (stateRef.current === 'paused') {
+        transitionTo('playing');
+        timerRef.current?.resume();
+      } else if (stateRef.current === 'failed') {
+        // Extra-life resume: restore 1 life and go back to playing
+        sessionOutcomeRef.current = null;
+        setEngineState((prev) => ({ ...prev, lives: 1 }));
         transitionTo('playing');
         timerRef.current?.resume();
       }
@@ -409,7 +445,17 @@ export function useGameEngine(options: UseGameEngineOptions): GameEngine & {
   // Reset engine for "Play Again" without page reload
   const reset = useCallback(() => {
     sessionOutcomeRef.current = null;
+
+    // Clear any pending fail timeout
+    if (failTimeoutRef.current) {
+      clearTimeout(failTimeoutRef.current);
+      failTimeoutRef.current = null;
+    }
+
+    // Destroy old timer and create a fresh one
     timerRef.current?.destroy();
+    timerRef.current = createTimer();
+
     setEngineState({
       state: 'loading',
       score: 0,
@@ -427,7 +473,7 @@ export function useGameEngine(options: UseGameEngineOptions): GameEngine & {
       scoreResult: null,
       rewardResult: null,
     });
-  }, [definition, diffConfig]);
+  }, [definition, diffConfig, createTimer]);
 
   return {
     ...engine,

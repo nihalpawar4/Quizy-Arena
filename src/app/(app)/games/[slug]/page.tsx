@@ -7,8 +7,7 @@ import { GameShell } from '@/engine/components/game-shell';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useAuthStore } from '@/stores/auth-store';
 import { getNextPlayLevel } from '@/lib/game-config';
-import { levelFromXp } from '@/lib/xp';
-import { isWorldUnlocked } from '@/lib/worlds';
+import { isGameUnlockedInWorld } from '@/lib/worlds';
 import {
   getDailyChallengeSlug,
   DAILY_CHALLENGE_LEVELS_REQUIRED,
@@ -40,19 +39,14 @@ function GamePlayContent() {
   const params = useParams<{ slug: string }>();
   const router = useRouter();
   const arenaProfile = useAuthStore((s) => s.arenaProfile);
-  const userProfile = useAuthStore((s) => s.userProfile);
+  const isProfileLoading = useAuthStore((s) => s.isProfileLoading);
 
   const [entry, setEntry] = useState<GameRegistryEntry | undefined>(undefined);
-  const [isReady, setIsReady] = useState(false);
+  const [accessChecked, setAccessChecked] = useState(false);
 
-  const globalLevel = Math.max(
-    levelFromXp(userProfile?.globalXp ?? 0),
-    arenaProfile?.arenaLevel ?? 1,
-    levelFromXp(arenaProfile?.arenaXp ?? 0),
-  );
-
-  // Detect if this game is today's daily challenge
   const isDailyChallenge = params.slug === getDailyChallengeSlug();
+  const highestCompleted = arenaProfile?.gameLevels?.[params.slug];
+  const startLevel = getNextPlayLevel(highestCompleted);
 
   useEffect(() => {
     const gameEntry = getGameEntry(params.slug);
@@ -61,28 +55,27 @@ function GamePlayContent() {
       return;
     }
 
-    const { definition } = gameEntry;
-    const worldOk = isWorldUnlocked(definition.worldSlug, globalLevel);
-    const levelOk = globalLevel >= definition.unlockLevel;
+    // Sequential unlock: game must be unlocked (world + previous game completed)
+    // Daily challenges bypass the lock check
+    const gameOk = isDailyChallenge || isGameUnlockedInWorld(params.slug, arenaProfile?.gameLevels);
 
-    if (!worldOk || !levelOk) {
+    if (!gameOk) {
       router.replace('/games');
       return;
     }
 
     setEntry(gameEntry);
-    setIsReady(true);
-  }, [params.slug, router, globalLevel]);
+    setAccessChecked(true);
+  }, [params.slug, router, arenaProfile?.gameLevels, isDailyChallenge]);
 
-  if (!isReady || !entry) {
+
+  if (isProfileLoading || !accessChecked || !entry) {
     return <GamePlaySkeleton />;
   }
 
-  const highestCompleted = arenaProfile?.gameLevels?.[params.slug];
-  const startLevel = getNextPlayLevel(highestCompleted);
-
   return (
     <GameShell
+      key={params.slug}
       definition={entry.definition}
       GameComponent={entry.component}
       initialLevel={startLevel}

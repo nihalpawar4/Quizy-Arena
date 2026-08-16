@@ -17,6 +17,7 @@ export { MAX_GAME_LEVEL };
  */
 
 import type { DifficultyConfig, GameDifficulty } from './types';
+import { EXTRA_GAME_BASE_SLUGS } from '@/games/extra/extra-games';
 
 /**
  * Maps game level (1-based) to the old difficulty category for reward scaling.
@@ -29,11 +30,15 @@ export function difficultyFromLevel(level: number): GameDifficulty {
 }
 
 function resolveBaseSlug(slug: string): string {
+  if (EXTRA_GAME_BASE_SLUGS[slug]) return EXTRA_GAME_BASE_SLUGS[slug];
   if (slug === 'memory-match' || slug === 'memory-grove') return 'memory-match';
   if (slug === 'speed-math' || slug === 'logic-sprint') return 'speed-math';
   if (slug === 'pattern-recall' || slug === 'pattern-trail') return 'pattern-recall';
   if (slug === 'ice-puzzle') return 'ice-puzzle';
   if (slug === 'frost-reflex') return 'frost-reflex';
+  if (slug === 'falling-ice') return 'falling-ice';
+  if (slug === 'glacier-match') return 'glacier-match';
+  if (slug === 'snowstorm-sort') return 'snowstorm-sort';
   if (slug === 'desert-riddle') return 'desert-riddle';
   if (slug === 'lava-logic') return 'lava-logic';
   if (slug === 'cyber-code') return 'cyber-code';
@@ -56,6 +61,12 @@ export function getLevelConfig(gameSlug: string, level: number): DifficultyConfi
       return getIcePuzzleConfig(l);
     case 'frost-reflex':
       return getFrostReflexConfig(l);
+    case 'falling-ice':
+      return getFallingIceConfig(l);
+    case 'glacier-match':
+      return getGlacierMatchConfig(l);
+    case 'snowstorm-sort':
+      return getSnowstormSortConfig(l);
     case 'desert-riddle':
       return getDesertRiddleConfig(l);
     case 'lava-logic':
@@ -298,6 +309,103 @@ function getCyberCodeConfig(level: number): DifficultyConfig {
     durationSec,
     maxScore,
     itemCount: patternLength,
+    roundCount,
+  };
+}
+
+// ═══ FALLING ICE (Math on Falling Blocks) ═══
+// Level 1: numbers 1-15, + and -, 6s fall time, 120s total
+// Level 5: numbers up to 40, +/-/×, 4s fall time
+// Level 10: numbers up to 80, all ops, 3s fall time
+
+function getFallingIceConfig(level: number): DifficultyConfig {
+  const maxOperand = clamp(
+    Math.floor(12 + (level - 1) * 7),
+    12,
+    80,
+  );
+
+  const speed = clamp(
+    1 + (level - 1) * 0.12,
+    1,
+    2.2,
+  );
+
+  const durationSec = clamp(
+    Math.floor(125 - level * 2),
+    90,
+    125,
+  );
+
+  const maxScore = clamp(600 + level * 60, 600, 1500);
+
+  return {
+    durationSec,
+    maxScore,
+    speed,
+    itemCount: maxOperand,
+  };
+}
+
+// ═══ GLACIER MATCH (Memory Sequence) ═══
+// Level 1: 6 crystals, start with 3-sequence, 90s
+// Level 5: 9 crystals, start with 5-sequence, 90s
+// Level 10: 12 crystals, start with 7-sequence, 90s
+
+function getGlacierMatchConfig(level: number): DifficultyConfig {
+  const gridSize = clamp(
+    Math.floor(6 + (level - 1) * 0.6),
+    6,
+    12,
+  );
+
+  const startSequence = clamp(
+    Math.floor(3 + (level - 1) * 0.4),
+    3,
+    8,
+  );
+
+  const durationSec = 90;
+  const maxScore = clamp(500 + level * 50, 500, 1500);
+
+  return {
+    durationSec,
+    maxScore,
+    gridSize,
+    itemCount: startSequence,
+  };
+}
+
+// ═══ SNOWSTORM SORT (Tap in Order) ═══
+// Level 1: 6 numbers, 5 rounds, 0 decoys, 90s
+// Level 5: 9 numbers, 7 rounds, ~3 decoys
+// Level 10: 14 numbers, 10 rounds, ~4 decoys
+
+function getSnowstormSortConfig(level: number): DifficultyConfig {
+  const itemCount = clamp(
+    Math.floor(6 + (level - 1) * 0.8),
+    6,
+    14,
+  );
+
+  const roundCount = clamp(
+    Math.floor(5 + (level - 1) * 0.5),
+    5,
+    12,
+  );
+
+  const durationSec = clamp(
+    Math.floor(95 - level * 1),
+    75,
+    95,
+  );
+
+  const maxScore = clamp(500 + level * 50, 500, 1500);
+
+  return {
+    durationSec,
+    maxScore,
+    itemCount,
     roundCount,
   };
 }

@@ -2,7 +2,7 @@
 
 
 import { motion } from 'framer-motion';
-import { Star, RotateCcw, ChevronRight, Zap, Trophy, ArrowRight } from 'lucide-react';
+import { Star, RotateCcw, ChevronRight, Zap, Trophy, ArrowRight, XCircle } from 'lucide-react';
 import type { GameDefinition, GameEngine, ScoreResult, RewardResult } from '../types';
 import { Button } from '@/components/ui/button';
 import { formatNumber, formatDuration, cn } from '@/lib/utils';
@@ -24,8 +24,10 @@ interface ResultScreenProps {
 
 /**
  * Result screen shown after a game ends.
- * Displays score, stars, accuracy, rewards, skill deltas, and level info.
- * Auto-triggers save after a brief pause on the results state.
+ * Distinguishes between completed (level cleared) and failed (lives ran out).
+ * - Completed: shows "Level X Complete!" with Next Level button
+ * - Failed: shows "Game Over" with Retry / Exit buttons (no Next Level)
+ * Buttons are only enabled after save completes (rewards state).
  */
 export function ResultScreen({
   definition,
@@ -39,11 +41,9 @@ export function ResultScreen({
   onContinue,
 }: ResultScreenProps) {
   const isLoading = !scoreResult || !rewardResult;
-  const isSaving = engine.state === 'saving';
-
-  // Auto-trigger save when results are displayed
-  // The engine handles results → saving transition automatically
-  // We no longer call engine.complete() here as that's an invalid transition from 'results'
+  const isCompleted = engine.sessionOutcome === 'completed';
+  const isFailed = engine.sessionOutcome === 'failed';
+  const buttonsReady = engine.state === 'rewards';
 
   if (isLoading) {
     return (
@@ -73,9 +73,18 @@ export function ResultScreen({
           transition={{ delay: 0.1, duration: 0.3 }}
           className="text-center"
         >
-          <p className="text-xs font-bold text-primary uppercase tracking-wider mb-1">
-            Level {level} Complete!
-          </p>
+          {isCompleted ? (
+            <p className="text-xs font-bold text-primary uppercase tracking-wider mb-1">
+              Level {level} Complete!
+            </p>
+          ) : (
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <XCircle className="h-4 w-4 text-danger" />
+              <p className="text-xs font-bold text-danger uppercase tracking-wider">
+                Game Over
+              </p>
+            </div>
+          )}
         </motion.div>
 
         {/* ── Stars ── */}
@@ -120,6 +129,20 @@ export function ResultScreen({
           >
             <Trophy className="h-4 w-4 text-success" />
             <span className="text-sm font-semibold text-success">New Personal Best!</span>
+          </motion.div>
+        )}
+
+        {/* ── Failed hint ── */}
+        {isFailed && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.7 }}
+            className="flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-danger/10 border border-danger/20"
+          >
+            <span className="text-sm text-danger">
+              You ran out of lives. Try again to clear this level!
+            </span>
           </motion.div>
         )}
 
@@ -187,44 +210,70 @@ export function ResultScreen({
           </motion.div>
         )}
 
-        {/* ── Actions ── */}
+        {/* ── Actions — only enabled after save completes (rewards state) ── */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.3 }}
           className="space-y-2 pt-2"
         >
-          {/* Primary: Next Level */}
-          {level < maxLevel ? (
+          {/* Completed: show Next Level as primary action */}
+          {isCompleted && level < maxLevel && (
             <Button
               className="w-full"
               onClick={onNextLevel}
-              isLoading={isSaving}
+              isLoading={!buttonsReady}
+              disabled={!buttonsReady}
             >
               <ArrowRight className="h-4 w-4" />
               Next Level ({level + 1}/{maxLevel})
             </Button>
-          ) : (
-            <Button className="w-full" onClick={onContinue} isLoading={isSaving}>
+          )}
+
+          {/* Completed at max level */}
+          {isCompleted && level >= maxLevel && (
+            <Button
+              className="w-full"
+              onClick={onContinue}
+              isLoading={!buttonsReady}
+              disabled={!buttonsReady}
+            >
               {maxLevel < MAX_GAME_LEVEL ? 'Challenge Complete' : 'All Levels Complete'}
               <ChevronRight className="h-4 w-4" />
             </Button>
           )}
 
-          {/* Secondary row */}
-          <div className="flex gap-2">
+          {/* Failed: Retry is primary action */}
+          {isFailed && (
             <Button
-              variant="secondary"
-              className="flex-1"
+              className="w-full"
               onClick={onPlayAgain}
+              disabled={!buttonsReady}
+              isLoading={!buttonsReady}
             >
               <RotateCcw className="h-4 w-4" />
-              Retry
+              Try Again
             </Button>
+          )}
+
+          {/* Secondary row */}
+          <div className="flex gap-2">
+            {isCompleted && (
+              <Button
+                variant="secondary"
+                className="flex-1"
+                onClick={onPlayAgain}
+                disabled={!buttonsReady}
+              >
+                <RotateCcw className="h-4 w-4" />
+                Retry
+              </Button>
+            )}
             <Button
               variant="secondary"
-              className="flex-1"
+              className={cn(isCompleted ? 'flex-1' : 'w-full')}
               onClick={onContinue}
+              disabled={!buttonsReady}
             >
               Exit
               <ChevronRight className="h-4 w-4" />
