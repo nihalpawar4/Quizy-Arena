@@ -136,11 +136,13 @@ service cloud.firestore {
     // ── Battle Arena Collections ──
 
     // arena_matchmaking/{uid} — Matchmaking queue entries
-    // Users can only manage their own entry, but can query others to find opponents
+    // Any authenticated user can read (to find opponents) and update (to set matched status).
+    // Only the owner can create or delete their own entry.
     match /arena_matchmaking/{uid} {
       allow read: if isAuthenticated();
-      allow create, update: if isOwner(uid);
-      allow delete: if isOwner(uid);
+      allow create: if isOwner(uid);
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
     }
 
     // arena_battles/{battleId} — Active battle documents

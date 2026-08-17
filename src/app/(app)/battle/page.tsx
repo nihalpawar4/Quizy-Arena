@@ -90,6 +90,10 @@ export default function BattlePage() {
   const opponentKey = playerKey === 'player1' ? 'player2' : 'player1';
   const opponent = battle ? battle[opponentKey] : null;
 
+  // Keep a ref that always points to the latest battle state (avoids stale closures)
+  const battleRef = useRef<BattleDocument | null>(null);
+  battleRef.current = battle;
+
   // Cleanup all listeners/timers
   const cleanup = useCallback(() => {
     matchmakingUnsub.current?.();
@@ -245,50 +249,49 @@ export default function BattlePage() {
   // ── Battle Score Update ──
   const handleScoreUpdate = useCallback(
     (score: number, correct: number, wrong: number) => {
-      if (!battle) return;
-      updateBattleScore(battle.id, myUid, playerKey, score, correct, wrong);
+      const b = battleRef.current;
+      if (!b) return;
+      updateBattleScore(b.id, myUid, playerKey, score, correct, wrong);
     },
-    [battle, myUid, playerKey],
+    [myUid, playerKey],
   );
 
   // ── Battle Time Up ──
   const handleTimeUp = useCallback(
     async (finalScore: number, correct: number, wrong: number) => {
-      if (!battle) return;
-      await finishBattle(battle.id, playerKey, finalScore, correct, wrong);
+      const b = battleRef.current;
+      if (!b) return;
 
-      // Wait a brief moment then check if both players are done
+      // Mark myself as finished in Firestore
+      await finishBattle(b.id, playerKey, finalScore, correct, wrong);
+
+      // Safety timeout: if after 5s the battle hasn't finalized, force it
       setTimeout(async () => {
-        // Re-read battle state from the listener's latest value
-        // The listener will handle the 'finished' status transition
-        // We just need to finalize if both are done
-        if (battle) {
-          const latestBattle = { ...battle };
-          latestBattle[playerKey] = {
-            ...latestBattle[playerKey],
+        const latest = battleRef.current;
+        if (latest && latest.status !== 'finished') {
+          // Build a merged version with my final data
+          const merged = { ...latest };
+          merged[playerKey] = {
+            ...merged[playerKey],
             score: finalScore,
             correctCount: correct,
             wrongCount: wrong,
             isFinished: true,
           };
-
-          // If both finished, finalize
-          if (latestBattle[opponentKey]?.isFinished) {
-            await finalizeBattle(battle.id, latestBattle);
-          }
+          await finalizeBattle(latest.id, merged);
         }
-      }, 1500);
+      }, 5000);
     },
-    [battle, playerKey, opponentKey],
+    [playerKey],
   );
 
-  // Watch for opponent finishing — finalize battle when both done
+  // Watch for both players finishing — finalize battle
   useEffect(() => {
-    if (!battle || phase !== 'playing') return;
-    if (battle.player1.isFinished && battle.player2.isFinished && battle.status !== 'finished') {
+    if (!battle || battle.status === 'finished') return;
+    if (battle.player1.isFinished && battle.player2.isFinished) {
       finalizeBattle(battle.id, battle);
     }
-  }, [battle, phase]);
+  }, [battle]);
 
   // ── Apply rewards on result ──
   useEffect(() => {
