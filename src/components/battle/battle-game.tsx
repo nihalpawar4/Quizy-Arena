@@ -86,7 +86,13 @@ export function BattleGame({
   const correctRef = useRef(0);
   const wrongRef = useRef(0);
 
-  // Timer countdown
+  // Store callbacks in refs so the timer never restarts when parent re-renders
+  const onTimeUpRef = useRef(onTimeUp);
+  onTimeUpRef.current = onTimeUp;
+  const onScoreUpdateRef = useRef(onScoreUpdate);
+  onScoreUpdateRef.current = onScoreUpdate;
+
+  // Timer countdown — runs once, never restarts
   useEffect(() => {
     const interval = setInterval(() => {
       setTimeLeft((prev) => {
@@ -94,7 +100,7 @@ export function BattleGame({
           clearInterval(interval);
           if (!hasEndedRef.current) {
             hasEndedRef.current = true;
-            onTimeUp(scoreRef.current, correctRef.current, wrongRef.current);
+            onTimeUpRef.current(scoreRef.current, correctRef.current, wrongRef.current);
           }
           return 0;
         }
@@ -103,7 +109,8 @@ export function BattleGame({
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [durationSec, onTimeUp]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Auto-focus input
   useEffect(() => {
@@ -135,14 +142,14 @@ export function BattleGame({
         scoreRef.current = newScore;
         correctRef.current = newCorrect;
         setFeedback('correct');
-        onScoreUpdate(newScore, newCorrect, wrongCount);
+        onScoreUpdateRef.current(newScore, newCorrect, wrongCount);
         setTimeout(nextProblem, 200);
       } else {
         const newWrong = wrongCount + 1;
         setWrongCount(newWrong);
         wrongRef.current = newWrong;
         setFeedback('wrong');
-        onScoreUpdate(score, correctCount, newWrong);
+        onScoreUpdateRef.current(score, correctCount, newWrong);
         setTimeout(() => {
           setFeedback(null);
           setUserAnswer('');
@@ -150,7 +157,7 @@ export function BattleGame({
         }, 400);
       }
     },
-    [userAnswer, problem, score, correctCount, wrongCount, timeLeft, onScoreUpdate, nextProblem],
+    [userAnswer, problem, score, correctCount, wrongCount, timeLeft, nextProblem],
   );
 
   const timerColor = timeLeft <= 10 ? 'text-danger' : timeLeft <= 30 ? 'text-warning' : 'text-text-secondary';
