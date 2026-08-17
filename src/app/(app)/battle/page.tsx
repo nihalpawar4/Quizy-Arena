@@ -213,6 +213,10 @@ export default function BattlePage() {
           setBattleResult('lose');
         }
         setPhase('result');
+
+        // Stop listening — prevents flickering on result screen
+        battleUnsub.current?.();
+        battleUnsub.current = null;
       }
     });
 
@@ -285,10 +289,14 @@ export default function BattlePage() {
     [playerKey],
   );
 
+  // Guard to prevent calling finalizeBattle more than once per session
+  const hasFinalizedRef = useRef(false);
+
   // Watch for both players finishing — finalize battle
   useEffect(() => {
-    if (!battle || battle.status === 'finished') return;
+    if (!battle || battle.status === 'finished' || hasFinalizedRef.current) return;
     if (battle.player1.isFinished && battle.player2.isFinished) {
+      hasFinalizedRef.current = true;
       finalizeBattle(battle.id, battle);
     }
   }, [battle]);
@@ -348,6 +356,7 @@ export default function BattlePage() {
     setBattle(null);
     setBattleResult(null);
     setRewardsApplied(false);
+    hasFinalizedRef.current = false;
     handleFindOpponent();
   }, [cleanup, handleFindOpponent]);
 
@@ -357,6 +366,7 @@ export default function BattlePage() {
     setBattle(null);
     setBattleResult(null);
     setRewardsApplied(false);
+    hasFinalizedRef.current = false;
     setPhase('lobby');
   }, [cleanup]);
 
