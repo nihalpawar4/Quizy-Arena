@@ -84,13 +84,15 @@ export function WorldGamesPanel({ worldSlug, playerLevel, gameLevels, onClose }:
         <div className="space-y-2">
           {games.length > 0 ? (
             games.map((game, index) => {
-              const highest = arenaProfile?.gameLevels?.[game.slug] ?? 0;
+              // Use store gameLevels (merged, never-regressed) for all checks
+              const storeGameLevels = arenaProfile?.gameLevels;
+              const highest = storeGameLevels?.[game.slug] ?? 0;
               const levelProgress = getGameLevelProgress(highest);
               const durationMin = Math.max(1, Math.ceil(game.defaultDurationSec / 60));
               const nextLevel = Math.min(highest + 1, MAX_GAME_LEVEL);
               const nextCoinCost = getGameCoinCost(nextLevel);
-              const gameUnlocked = isGameUnlockedInWorld(game.slug, gameLevels);
-              const done = isGameDone(game.slug, gameLevels);
+              const gameUnlocked = isGameUnlockedInWorld(game.slug, storeGameLevels);
+              const done = isGameDone(game.slug, storeGameLevels);
 
               // Get the name of the game that must be completed to unlock this one
               const prevGameName = index > 0 ? games[index - 1].title : null;
@@ -146,20 +148,21 @@ export function WorldGamesPanel({ worldSlug, playerLevel, gameLevels, onClose }:
                         <Clock className="h-3 w-3" />
                         {durationMin} min
                       </span>
-                      {nextCoinCost > 0 ? (
+                      {!done && nextCoinCost > 0 ? (
                         <span className="text-[10px] text-amber-500 flex items-center gap-0.5 font-medium">
                           <CoinIcon size={10} className="text-amber-500" />
                           {nextCoinCost}
                         </span>
-                      ) : (
+                      ) : !done ? (
                         <Badge variant="success">Free</Badge>
-                      )}
+                      ) : null}
                     </div>
                     <div className="mt-2">
                       <ProgressBar value={levelProgress} size="sm" />
                       <p className="text-[10px] text-text-tertiary mt-0.5">
-                        Level {nextLevel}/{MAX_GAME_LEVEL}
-                        {done ? ' · Complete' : ''}
+                        {done
+                          ? `Level ${MAX_GAME_LEVEL}/${MAX_GAME_LEVEL} · Complete`
+                          : `Level ${highest}/${MAX_GAME_LEVEL}`}
                       </p>
                     </div>
                   </div>

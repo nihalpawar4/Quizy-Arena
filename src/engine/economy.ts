@@ -1,7 +1,8 @@
 /**
  * Economy Module
  *
- * Handles coin costs for games (after Level 1) and diamond-to-lives conversion.
+ * Handles coin costs for games (after Level 1), diamond-to-lives conversion,
+ * and diamond-to-coins exchange.
  * All Firestore mutations use atomic increment to prevent race conditions.
  */
 
@@ -33,6 +34,11 @@ export function canAffordGame(coins: number, level: number): boolean {
  * Diamond cost for one extra life.
  */
 export const DIAMOND_PER_LIFE = 5;
+
+/**
+ * How many coins 1 diamond is worth when exchanging.
+ */
+export const COINS_PER_DIAMOND = 50;
 
 /**
  * Deduct coins from the user's profile atomically.
@@ -70,3 +76,32 @@ export async function buyExtraLife(uid: string): Promise<boolean> {
     return false;
   }
 }
+
+/**
+ * Exchange diamonds for coins.
+ * 1 diamond = COINS_PER_DIAMOND coins (50).
+ * @param count Number of diamonds to exchange
+ * Returns true if the exchange was successful.
+ */
+export async function exchangeDiamondsForCoins(
+  uid: string,
+  count: number,
+): Promise<boolean> {
+  if (count <= 0) return false;
+  const coinsGained = count * COINS_PER_DIAMOND;
+  try {
+    const userRef = getDocRef('users', uid);
+    await updateDoc(userRef, {
+      diamonds: increment(-count),
+      coins: increment(coinsGained),
+    });
+    const store = useAuthStore.getState();
+    store.adjustDiamonds(-count);
+    store.adjustCoins(coinsGained);
+    return true;
+  } catch (error) {
+    console.error('[Economy] Failed to exchange diamonds for coins:', error);
+    return false;
+  }
+}
+

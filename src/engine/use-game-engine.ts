@@ -262,9 +262,16 @@ export function useGameEngine(options: UseGameEngineOptions): GameEngine & {
         applyGameRewards(payload, rewardResult);
 
         saveGameSession({ payload, rewards: rewardResult, definition, currentGameLevels: liveArena?.gameLevels })
-          .then(() => transitionTo('rewards'))
+          .then(() => {
+            // Re-apply optimistic update after save completes in case the
+            // onSnapshot listener delivered stale data in between.
+            applyGameRewards(payload, rewardResult);
+            transitionTo('rewards');
+          })
           .catch((err) => {
             console.error('[GameEngine] Save failed:', err);
+            // Re-apply so local state still reflects the completed level
+            applyGameRewards(payload, rewardResult);
             transitionTo('rewards'); // Show rewards anyway
           });
       } else {

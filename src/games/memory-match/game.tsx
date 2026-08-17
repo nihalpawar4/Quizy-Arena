@@ -159,6 +159,22 @@ export default function MemoryMatchGame({ engine }: GameComponentProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [flippedIds]);
 
+  // Safety net: complete the game when every card is matched, even if
+  // matchedCountRef drifted due to timing / stale-closure issues.
+  useEffect(() => {
+    if (engine.state !== 'playing') return;
+    if (isPreviewing) return;
+    if (cards.length === 0) return;
+
+    const allMatched = cards.every((c) => c.isMatched);
+    if (allMatched) {
+      // Ensure the ref is also up to date
+      matchedCountRef.current = pairCount;
+      setTimeout(() => engine.complete(), 300);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cards]);
+
   const handleCardClick = useCallback(
     (cardId: number) => {
       if (isPreviewing) return;

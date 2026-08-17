@@ -15,7 +15,7 @@ import { ChevronRight, ArrowLeft, Coins } from 'lucide-react';
 import { GameIcon } from '@/components/games/game-icon';
 import { CoinIcon, DiamondIcon, LightningIcon } from '@/components/illustrations/icons';
 import { MAX_GAME_LEVEL } from '@/lib/game-config';
-import { getGameCoinCost, canAffordGame, deductCoins, buyExtraLife, DIAMOND_PER_LIFE } from '../economy';
+import { getGameCoinCost, canAffordGame, deductCoins, buyExtraLife, exchangeDiamondsForCoins, DIAMOND_PER_LIFE, COINS_PER_DIAMOND } from '../economy';
 import { useAuthStore } from '@/stores/auth-store';
 import { cn } from '@/lib/utils';
 
@@ -112,6 +112,7 @@ function GameShellInner({
 }: GameShellInnerProps) {
   const [coinCheckPassed, setCoinCheckPassed] = useState(false);
   const [deductingCoins, setDeductingCoins] = useState(false);
+  const [exchanging, setExchanging] = useState(false);
 
   const userProfile = useAuthStore((s) => s.userProfile);
   const firebaseUser = useAuthStore((s) => s.firebaseUser);
@@ -161,6 +162,14 @@ function GameShellInner({
     }
   }, [firebaseUser, userDiamonds, engine]);
 
+  const handleExchangeDiamond = useCallback(async () => {
+    if (!firebaseUser || userDiamonds < 1) return;
+    setExchanging(true);
+    // Exchange just 1 diamond at a time so user has control
+    await exchangeDiamondsForCoins(firebaseUser.uid, 1);
+    setExchanging(false);
+  }, [firebaseUser, userDiamonds]);
+
   const wrappedPlayAgain = useCallback(() => {
     setCoinCheckPassed(false);
     onPlayAgain();
@@ -187,8 +196,11 @@ function GameShellInner({
           coinCost={coinCost}
           canAfford={canAfford}
           userCoins={userCoins}
+          userDiamonds={userDiamonds}
           deductingCoins={deductingCoins}
+          exchanging={exchanging}
           onStart={coinCost > 0 ? handlePayAndStart : () => engine.startCountdown()}
+          onExchangeDiamond={handleExchangeDiamond}
           onBack={onExit}
         />
       )}
@@ -397,8 +409,11 @@ function GameInstructionsScreen({
   coinCost,
   canAfford,
   userCoins,
+  userDiamonds,
   deductingCoins,
+  exchanging,
   onStart,
+  onExchangeDiamond,
   onBack,
 }: {
   definition: GameDefinition;
@@ -407,10 +422,18 @@ function GameInstructionsScreen({
   coinCost: number;
   canAfford: boolean;
   userCoins: number;
+  userDiamonds: number;
   deductingCoins: boolean;
+  exchanging: boolean;
   onStart: () => void;
+  onExchangeDiamond: () => void;
   onBack: () => void;
 }) {
+  // How many diamonds needed to cover the coin deficit
+  const deficit = Math.max(0, coinCost - userCoins);
+  const diamondsNeeded = Math.ceil(deficit / COINS_PER_DIAMOND);
+  const canExchange = userDiamonds >= 1 && !canAfford && coinCost > 0;
+
   return (
     <div className="flex-1 flex flex-col">
       {/* Back button */}
@@ -534,7 +557,7 @@ function GameInstructionsScreen({
             animate={{ opacity: 1 }}
             transition={{ delay: 0.55 }}
             className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-xl mb-6 text-sm font-medium',
+              'flex items-center gap-2 px-4 py-2 rounded-xl mb-4 text-sm font-medium',
               canAfford
                 ? 'bg-amber-500/10 border border-amber-500/20 text-amber-600'
                 : 'bg-red-500/10 border border-red-500/20 text-red-500',
@@ -549,11 +572,42 @@ function GameInstructionsScreen({
           </motion.div>
         )}
 
+        {/* Diamond Exchange — shown when user can't afford */}
+        {canExchange && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.6 }}
+            className="w-full max-w-xs rounded-2xl bg-gradient-to-br from-accent/10 to-accent/5 border border-accent/20 p-4 mb-6"
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <DiamondIcon size={16} className="text-accent" />
+              <span className="text-sm font-semibold text-text-primary">Exchange Diamonds</span>
+            </div>
+            <p className="text-xs text-text-secondary mb-3">
+              1 Diamond = {COINS_PER_DIAMOND} Coins · You need {diamondsNeeded} diamond{diamondsNeeded > 1 ? 's' : ''} to play
+            </p>
+            <Button
+              size="sm"
+              className="w-full bg-accent hover:bg-accent/90 text-white"
+              onClick={onExchangeDiamond}
+              disabled={exchanging || userDiamonds < 1}
+              isLoading={exchanging}
+            >
+              <DiamondIcon size={14} className="mr-1.5" />
+              Exchange 1 Diamond → {COINS_PER_DIAMOND} Coins
+            </Button>
+            <p className="text-[10px] text-text-tertiary text-center mt-2">
+              You have {userDiamonds} diamond{userDiamonds !== 1 ? 's' : ''}
+            </p>
+          </motion.div>
+        )}
+
         {/* Animated Start Button */}
         <motion.div
           initial={{ y: 10, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ delay: 0.6, duration: 0.4 }}
+          transition={{ delay: canExchange ? 0.7 : 0.6, duration: 0.4 }}
         >
           <Button
             size="lg"
@@ -582,7 +636,7 @@ function GameInstructionsScreen({
               <ChevronRight className="h-5 w-5" />
             </span>
           </Button>
-          {!canAfford && coinCost > 0 && (
+          {!canAfford && coinCost > 0 && !canExchange && (
             <p className="text-xs text-red-400 mt-2 text-center">
               Play more games to earn coins!
             </p>
