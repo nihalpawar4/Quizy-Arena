@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useAuthStore } from '@/stores/auth-store';
 import { ResetNotice } from '@/components/reset-notice';
+import { BattleAnnouncement } from '@/components/battle/battle-announcement';
 import { useRecentGames } from '@/hooks/use-recent-games';
 import { useLeaderboard } from '@/hooks/use-leaderboard';
 import { formatNumber, getGreeting } from '@/lib/utils';
@@ -115,6 +116,8 @@ export default function HomePage() {
     <div className="space-y-5 max-w-2xl mx-auto">
       {/* Reset notice popup — shows once after major update */}
       <ResetNotice />
+      {/* Battle Arena announcement — shows once, never again */}
+      <BattleAnnouncement />
 
       {/* ═══ Hero Banner ═══ */}
       <section className="relative overflow-hidden rounded-3xl bg-surface shadow-md">

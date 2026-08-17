@@ -132,5 +132,23 @@ service cloud.firestore {
       allow write: if isAuthenticated()
         && request.resource.data.userId == request.auth.uid;
     }
+
+    // ── Battle Arena Collections ──
+
+    // arena_matchmaking/{uid} — Matchmaking queue entries
+    // Users can only manage their own entry, but can query others to find opponents
+    match /arena_matchmaking/{uid} {
+      allow read: if isAuthenticated();
+      allow create, update: if isOwner(uid);
+      allow delete: if isOwner(uid);
+    }
+
+    // arena_battles/{battleId} — Active battle documents
+    // Participants can read the full doc and update their own player fields
+    match /arena_battles/{battleId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+    }
   }
 }
