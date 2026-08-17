@@ -194,29 +194,35 @@ export default function BattlePage() {
     searchTimerRef.current = null;
 
     // Start battle listener
+    let lastStatus = '';
     battleUnsub.current = listenToBattle(battleId, (doc) => {
       if (!doc) return;
       setBattle(doc);
 
-      if (doc.status === 'countdown') {
-        setPhase('countdown');
-      } else if (doc.status === 'playing') {
-        setPhase('playing');
-      } else if (doc.status === 'finished') {
-        // Determine result
-        const myUid = firebaseUser?.uid ?? '';
-        if (doc.winnerId === null) {
-          setBattleResult('draw');
-        } else if (doc.winnerId === myUid) {
-          setBattleResult('win');
-        } else {
-          setBattleResult('lose');
-        }
-        setPhase('result');
+      // Only transition phase when the Firestore status actually changes
+      if (doc.status !== lastStatus) {
+        lastStatus = doc.status;
 
-        // Stop listening — prevents flickering on result screen
-        battleUnsub.current?.();
-        battleUnsub.current = null;
+        if (doc.status === 'countdown') {
+          setPhase('countdown');
+        } else if (doc.status === 'playing') {
+          setPhase('playing');
+        } else if (doc.status === 'finished') {
+          // Determine result
+          const myUid = firebaseUser?.uid ?? '';
+          if (doc.winnerId === null) {
+            setBattleResult('draw');
+          } else if (doc.winnerId === myUid) {
+            setBattleResult('win');
+          } else {
+            setBattleResult('lose');
+          }
+          setPhase('result');
+
+          // Stop listening — prevents flickering on result screen
+          battleUnsub.current?.();
+          battleUnsub.current = null;
+        }
       }
     });
 
@@ -260,6 +266,9 @@ export default function BattlePage() {
     [myUid, playerKey],
   );
 
+  // Guard to prevent calling finalizeBattle more than once per session
+  const hasFinalizedRef = useRef(false);
+
   // ── Battle Time Up ──
   const handleTimeUp = useCallback(
     async (finalScore: number, correct: number, wrong: number) => {
@@ -267,37 +276,36 @@ export default function BattlePage() {
       if (!b) return;
 
       // Mark myself as finished in Firestore
-      await finishBattle(b.id, playerKey, finalScore, correct, wrong);
+      await finishBattle(b.id, playerKey, finalScore, correct, wrong).catch(() => {});
 
-      // Safety timeout: if after 5s the battle hasn't finalized, force it
+      // Force-finalize after 2s — don't wait for the other player
       setTimeout(async () => {
+        if (hasFinalizedRef.current) return;
         const latest = battleRef.current;
-        if (latest && latest.status !== 'finished') {
-          // Build a merged version with my final data
-          const merged = { ...latest };
-          merged[playerKey] = {
-            ...merged[playerKey],
-            score: finalScore,
-            correctCount: correct,
-            wrongCount: wrong,
-            isFinished: true,
-          };
-          await finalizeBattle(latest.id, merged);
-        }
-      }, 5000);
+        if (!latest || latest.status === 'finished') return;
+
+        hasFinalizedRef.current = true;
+        // Build merged version with my final data
+        const merged = { ...latest };
+        merged[playerKey] = {
+          ...merged[playerKey],
+          score: finalScore,
+          correctCount: correct,
+          wrongCount: wrong,
+          isFinished: true,
+        };
+        await finalizeBattle(latest.id, merged).catch(() => {});
+      }, 2000);
     },
     [playerKey],
   );
 
-  // Guard to prevent calling finalizeBattle more than once per session
-  const hasFinalizedRef = useRef(false);
-
-  // Watch for both players finishing — finalize battle
+  // Watch for both players finishing — finalize battle immediately
   useEffect(() => {
     if (!battle || battle.status === 'finished' || hasFinalizedRef.current) return;
     if (battle.player1.isFinished && battle.player2.isFinished) {
       hasFinalizedRef.current = true;
-      finalizeBattle(battle.id, battle);
+      finalizeBattle(battle.id, battle).catch(() => {});
     }
   }, [battle]);
 
